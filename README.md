@@ -13,7 +13,7 @@ Através do emissor de Nota Fiscal da WebmaniaBR®, você conta com a emissão e
 
 ## Instalação do Módulo
 
-O módulo de PrestaShop da WebmaniaBR® é compatível com as versões 1.5 e 1.6. Realize o download do módulo no Github e faça o upload no painel de controle da sua loja virtual PrestaShop. 
+O módulo de PrestaShop da WebmaniaBR® é compatível com as versões 1.5 e 1.6. Realize o download do módulo no Github e faça o upload do arquivo **webmaniabrnfe.zip** no painel de controle da sua loja virtual PrestaShop. 
 
 <p align="center">
 <img src="https://webmaniabr.com/atendimento/wp-content/uploads/sites/4/2016/06/img_5771a725955f6.png">
