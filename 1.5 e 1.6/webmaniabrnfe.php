@@ -33,7 +33,7 @@ class WebmaniaBrNFe extends Module{
     parent::__construct();
 
 
-    if(Module::isInstalled('webmaniabrnfe', 'AdminModules') && $this->context->controller->controller_type == 'admin'){
+    if(Module::isInstalled('webmaniabrnfe', 'AdminModules') && isset($this->context->controller->controller_type) &&  $this->context->controller->controller_type == 'admin'){
       $this->checkAuthentication();
       $this->checkCURL();
     }
@@ -882,7 +882,7 @@ class WebmaniaBrNFe extends Module{
 
      //produtos
      foreach ($products as $key => $item){
-       
+
        $product_id = $item['product_id'];
 
        /*
@@ -894,7 +894,7 @@ class WebmaniaBrNFe extends Module{
        $origem = Db::getInstance()->getValue('SELECT nfe_product_source FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
        $imposto = Db::getInstance()->getValue('SELECT nfe_tax_class FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
        $peso = $item['product_weight'];
-         
+
        $kg = explode('.', $peso);
        if (strlen($kg[0]) >= 3) {
 
