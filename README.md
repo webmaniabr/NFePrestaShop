@@ -32,6 +32,17 @@ Após realizar o download da última versão ([Clique aqui](https://github.com/w
 <img src="https://webmaniabr.com/atendimento/wp-content/uploads/sites/4/2016/06/img_5771a771d14d1.png">
 </p>
 
+## Adaptar página Finalizar Compra
+
+O módulo insere automaticamente os campos obrigatórios na página de Finalizar Compra, Cadastro de novo cliente e Painel de controle para que as notas fiscais sejam emitidas corretamente. Caso possua outros módulos ou tenha adicionado diretamente no tema os campos como CPF, CNPJ, entre outros, precisa ser desativado para que seja utilizado somente o módulo de NFe do PrestaShop.
+
+É importante que o tema da loja virtual siga o checkout padrão para que possa inserir os campos necessários, porém alterações podem ser feitas nos seguintes arquivos caso haja necessidade:
+
+- /modules/webmaniabrnfe/views/templates/front/documents_view.1.X.tpl
+- /modules/webmaniabrnfe/js/scripts_fo.1.X.js
+
+Havendo dúvidas de como manusear os arquivos e eventuais incompatibilidades com o seu tema, por favor, entre em contato no e-mail suporte@webmaniabr.com.
+
 ## Instruções
 
 **PrestaShop 1.6**
