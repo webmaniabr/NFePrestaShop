@@ -14,7 +14,7 @@ Através do emissor de Nota Fiscal da WebmaniaBR®, você conta com a emissão e
 
 ## Instalação do Módulo
 
-Após realizar o download da última versão ([Clique aqui](https://github.com/webmaniabr/NFeOpenCart/releases)) faça o upload do arquivo no painel de controle da sua loja virtual PrestaShop.
+Após realizar o download da última versão ([Clique aqui](https://github.com/webmaniabr/NFePrestaShop/releases)) faça o upload do arquivo no painel de controle da sua loja virtual PrestaShop.
 
 <p align="center">
 <img src="https://webmaniabr.com/atendimento/wp-content/uploads/sites/4/2016/06/img_5771a725955f6.png">
