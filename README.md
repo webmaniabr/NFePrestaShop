@@ -1,8 +1,9 @@
 # Nota Fiscal Eletrônica para PrestaShop
 
-Através do emissor de Nota Fiscal da WebmaniaBR®, você conta com a emissão e arquivamento das suas notas fiscais, cálculo automático de impostos, geração do Danfe para impressão e envio automático de e-mails para os clientes. Instale o módulo grátis do PrestaShop e contrate um dos planos de Nota Fiscal Eletrônica da WebmaniaBR® a partir de R$29,90/mês: [Assine agora mesmo](https://webmaniabr.com/smartsales/nota-fiscal-eletronica/).
+Através do emissor de Nota Fiscal da WebmaniaBR®, você conta com a emissão e arquivamento das suas notas fiscais, cálculo automático de impostos, geração do Danfe para impressão e envio automático de e-mails para os clientes.
 
 - **Módulo compatível com as versões 1.5 e 1.6**
+- **Faça download da última versão do módulo: [Clique aqui](https://github.com/webmaniabr/NFePrestaShop/releases)**
 - Emissor de NF-e da WebmaniaBR®: [Saiba mais](https://webmaniabr.com/smartsales/nota-fiscal-eletronica/)
 - Documentação da REST API: [Visualizar](https://webmaniabr.com/docs/rest-api-nfe/)
 
@@ -13,7 +14,7 @@ Através do emissor de Nota Fiscal da WebmaniaBR®, você conta com a emissão e
 
 ## Instalação do Módulo
 
-O módulo de PrestaShop da WebmaniaBR® é compatível com as versões 1.5 e 1.6. Realize o download do módulo no Github e faça o upload do arquivo **webmaniabrnfe.zip** no painel de controle da sua loja virtual PrestaShop. 
+Após realizar o download da última versão ([Clique aqui](https://github.com/webmaniabr/NFeOpenCart/releases)) faça o upload do arquivo no painel de controle da sua loja virtual PrestaShop.
 
 <p align="center">
 <img src="https://webmaniabr.com/atendimento/wp-content/uploads/sites/4/2016/06/img_5771a725955f6.png">
