@@ -66,7 +66,6 @@ class WebmaniaBrNFe extends Module{
       'displayCustomerAccount',
       'actionPaymentConfirmation',
       'displayAdminProductsExtra',
-      'displayAdminProductsExtra',
       'actionProductUpdate',
       'actionAdminOrdersListingFieldsModifier',
       'createAccountForm',
@@ -617,12 +616,12 @@ class WebmaniaBrNFe extends Module{
         'cest_code' => $values[0]['nfe_cest_code'],
         'product_source' => $values[0]['nfe_product_source']
       ));
+    }
 
-      if(_MAIN_PS_VERSION_ == '1.5'){
-        return $this->display(__FILE__, 'nfe_product_tab.1.5.tpl');
-      }else{
-        return $this->display(__FILE__, 'nfe_product_tab.1.6.tpl');
-      }
+    if(_MAIN_PS_VERSION_ == '1.5'){
+      return $this->display(__FILE__, 'nfe_product_tab.1.5.tpl');
+    }else{
+      return $this->display(__FILE__, 'nfe_product_tab.1.6.tpl');
     }
 
   }
