@@ -16,7 +16,7 @@ Através do emissor de Nota Fiscal da WebmaniaBR®, você conta com a emissão e
 
 Após realizar o download da última versão ([Clique aqui](https://github.com/webmaniabr/NFePrestaShop/releases)) faça o upload do arquivo no painel de controle da sua loja virtual PrestaShop.
 
-**OBS:** Este módulo de NF-e é incompatível com o módulo FKcustomers.
+**OBS:** Desinstale o módulo FKcustomers caso esteja ativado, sendo que este módulo insere automaticamente os campos obrigatórios na página de Finalizar Compra, Cadastro de novo cliente e Painel de controle.
 
 <p align="center">
 <img src="https://webmaniabr.com/atendimento/wp-content/uploads/sites/4/2016/06/img_5771a725955f6.png">
