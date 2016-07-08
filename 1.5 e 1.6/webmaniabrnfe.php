@@ -1159,8 +1159,8 @@ class WebmaniaBrNFe extends Module{
   function cpf( $string ){
 
   if (!$string) return;
-  $string = self::clear( $string );
-  $string = self::mask($string,'###.###.###-##');
+  $string = $this->clear( $string );
+  $string = $this->mask($string,'###.###.###-##');
 
   return $string;
 
@@ -1169,12 +1169,34 @@ class WebmaniaBrNFe extends Module{
   function cnpj( $string ){
 
     if (!$string) return;
-    $string = self::clear( $string );
-    $string = self::mask($string,'##.###.###/####-##');
+    $string = $this->clear( $string );
+    $string = $this->mask($string,'##.###.###/####-##');
 
     return $string;
 
   }
+
+  function clear( $string ) {
+
+        $string = str_replace( array(',', '-', '!', '.', '/', '?', '(', ')', ' ', '$', 'R$', '€'), '', $string );
+        return $string;
+
+	}
+
+	function mask($val, $mask) {
+	   $maskared = '';
+	   $k = 0;
+	   for($i = 0; $i<=strlen($mask)-1; $i++){
+           if($mask[$i] == '#'){
+               if(isset($val[$k]))
+                   $maskared .= $val[$k++];
+           }
+           else {
+               if(isset($mask[$i])) $maskared .= $mask[$i];
+           }
+	   }
+	   return $maskared;
+	}
 
 
   public function getValidadeCertificado(){
