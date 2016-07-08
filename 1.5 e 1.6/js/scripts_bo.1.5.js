@@ -64,6 +64,10 @@ if($('#address1').length > 0){
   WmBRAdminOrdersController.getHTMLElements.addressNumber().insertAfter($('#address1').parents('.margin-form').next('.clear'));
 }
 
+if($('#address1').length == 0){
+  WmBRAdminOrdersController.getHTMLElements.addressNumber().insertAfter($('#address').parents('.margin-form').next('.clear'));
+}
+
 //Get address_number from DB
 if($('input[name="address_number"]').length > 0){
     var address_id = $('#id_address').val();
@@ -78,7 +82,9 @@ if($('input[name="address_number"]').length > 0){
       success: function(json) {
         console.log(json);
         result = $.parseJSON(json);
-        $('input[name="address_number"]').val(result[0].address_number);
+        if(typeof result[0] != 'undefined'){
+          $('input[name="address_number"]').val(result[0].address_number);
+        }
     }
   });
   }
@@ -149,4 +155,8 @@ if($('input[name="address_number"]').length > 0){
   });
 
   WmBRAdminOrdersController.getHTMLElements.submitBulkElement().insertAfter($('.table.order'));
+
+  if($('#address2').length > 0){
+    $('#address2').parents('.margin-form').prev('label').html('Bairro');
+  }
 });
