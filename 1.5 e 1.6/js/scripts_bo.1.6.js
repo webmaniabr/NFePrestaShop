@@ -72,5 +72,12 @@ jQuery(document).ready(function(){
   }
 
   addressNumber().insertAfter($('#address1').parents('.form-group'));
+  if($('#address1').length == 0){
+    addressNumber().insertAfter($('#address').parents('.form-group'));
+  }
+
+  if($('#address2').length > 0){
+    $('#address2').parents('.form-group').find('label').addClass('required').html('Bairro');
+  }
 
 });
