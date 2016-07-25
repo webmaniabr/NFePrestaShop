@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '1.0.1';
+    $this->version = '2.0';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.4', 'max' => _PS_VERSION_);
@@ -71,6 +71,7 @@ class WebmaniaBrNFe extends Module{
       'createAccountForm',
       'actionCustomerAccountAdd',
       'displayCustomerAccount',
+      'displayInvoice',
     );
 
     $hooks_1_4 = array(
@@ -334,6 +335,31 @@ class WebmaniaBrNFe extends Module{
 
     $fields_form[2]['form'] = array(
       'legend' => array(
+        'title' => $this->l('Informações Complementares (Opcional)'),
+      ),
+      'input' => array(
+        array(
+          'type' => 'textarea',
+          'label' => $this->l('Informações ao Fisco'),
+          'name' => $this->name.'fisco_inf',
+          'size' => 2000,
+          'cols' => 50,
+          'required' => false
+        ),
+        array(
+          'type' => 'textarea',
+          'label' => $this->l('Informações Complementares ao Consumidor'),
+          'name' => $this->name.'cons_inf',
+          'size' => 2000,
+          'cols' => 50,
+          'required' => false
+        ),
+      ),
+
+    );
+
+    $fields_form[3]['form'] = array(
+      'legend' => array(
         'title' => $this->l('Opções Adicionais'),
       ),
       'input' => array(
@@ -379,7 +405,7 @@ class WebmaniaBrNFe extends Module{
 
 
     if(_MAIN_PS_VERSION_ == '1.6' || _MAIN_PS_VERSION_ == '1.5'){
-      $fields_form[3]['form'] = array(
+      $fields_form[4]['form'] = array(
         'legend' => array(
           'title' => $this->l('Salvar alteraçoes')
         ),
@@ -440,6 +466,8 @@ class WebmaniaBrNFe extends Module{
       $this->name.'person_type_fields' => Configuration::get($this->name.'person_type_fields'),
       $this->name.'mask_fields' => Configuration::get($this->name.'mask_fields'),
       $this->name.'fill_address' => Configuration::get($this->name.'fill_address'),
+      $this->name.'fisco_inf' => Configuration::get($this->name.'fisco_inf'),
+      $this->name.'cons_inf' => Configuration::get($this->name.'cons_inf'),
     );
 
   }
@@ -462,6 +490,8 @@ class WebmaniaBrNFe extends Module{
       $this->name.'person_type_fields' => 'on',
       $this->name.'mask_fields' => 'off',
       $this->name.'fill_address' => 'off',
+      $this->name.'fisco_inf' => '',
+      $this->name.'cons_inf' => '',
     );
 
   }
@@ -488,6 +518,7 @@ class WebmaniaBrNFe extends Module{
   public function hookBackOfficeHeader($params){
 
     $this->processBulkEmitirNfe();
+    $this->updateNfe();
 
     if(_MAIN_PS_VERSION_ == '1.6'){
       $controller_name = $this->context->controller->controller_name;
@@ -528,6 +559,45 @@ class WebmaniaBrNFe extends Module{
     $this->hookBackOfficeHeader($params);
     $this->displayMessageCertificado();
     $this->displayMessageSefaz();
+
+  }
+
+  public function hookDisplayInvoice($params) {
+
+    $order_id = $params['id_order'];
+    $nfe_info = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $order_id" ));
+
+    $url  = 'index.php?controller=AdminOrders&id_order='.$order_id;
+    $url .= '&vieworder&token='.Tools::getAdminTokenLite('AdminOrders');
+    if(!$nfe_info){
+      echo '<div class="panel kpi-container" id="nfe_emitidas">
+      <div class="row">
+      <h3 style="padding-left:15px;">Notas emitidas para este pedido</h3>
+      <p>Nenhuma nota emitida</p>
+      </div>
+      </div>';
+    }else{
+
+      if(_MAIN_PS_VERSION_ == '1.5'){
+        echo '<script>jQuery(document).ready(function(){$("#nfe_emitidas").parent("div").attr("style", "");})</script>';
+        echo '<style>
+        #nfe_emitidas table{
+          border:1px solid #000;
+          border-collapse:collapse;
+        }
+
+        #nfe_emitidas tbody tr{
+          border:1px solid #000;
+        }
+        </style>';
+      }
+
+      $this->context->smarty->assign(array(
+        'nfe_info_arr' => $nfe_info,
+        'url' => $url,
+      ));
+      return $this->display(__FILE__, 'nfe_info_table.tpl');
+    }
 
   }
 
@@ -614,7 +684,8 @@ class WebmaniaBrNFe extends Module{
         'ean_bar_code' => $values[0]['nfe_ean_bar_code'],
         'ncm_code' => $values[0]['nfe_ncm_code'],
         'cest_code' => $values[0]['nfe_cest_code'],
-        'product_source' => $values[0]['nfe_product_source']
+        'product_source' => $values[0]['nfe_product_source'],
+        'ignorar_nfe' => $values[0]['nfe_ignorar_nfe']
       ));
     }
 
@@ -634,7 +705,8 @@ class WebmaniaBrNFe extends Module{
       'nfe_ean_bar_code' => pSQL(Tools::getValue('nfe_ean_bar_code')),
       'nfe_ncm_code' => pSQL(Tools::getValue('nfe_ncm_code')),
       'nfe_cest_code' => pSQL(Tools::getValue('nfe_cest_code')),
-      'nfe_product_source' => pSQL(Tools::getValue('nfe_product_source'))
+      'nfe_product_source' => pSQL(Tools::getValue('nfe_product_source')),
+      'nfe_ignorar_nfe' => pSQL(Tools::getValue('nfe_ignorar_nfe'))
     ),'id_product = ' .$id_product )){
       $this->context->controller->_errors[] = Tools::displayError('Error: ').mysql_error();
     }
@@ -811,15 +883,23 @@ class WebmaniaBrNFe extends Module{
 
 
   public function getOrderData($orderID){
+
     $order = new Order($orderID);
+    $discounts = $order->getDiscounts(true);
+    $discounts_applied = array(); // Only percentage
+
+    foreach($discounts as $discount){
+      $cart_rule = new CartRule($discount['id_cart_rule']);
+      if($cart_rule->reduction_percent > 0){
+        $discounts_applied[] = $cart_rule->reduction_percent;
+      }
+    }
 
     //Version Compliance
     if(_MAIN_PS_VERSION_ == '1.4'){
       $customer = new Customer($order->id_customer);
-      $total_paid = number_format($order->total_paid, 2);
     }else{
       $customer = $order->getCustomer();
-      $total_paid = number_format($order->total_paid_tax_incl, 2);
     }
 
     $address = new Address($order->id_address_delivery);
@@ -843,11 +923,25 @@ class WebmaniaBrNFe extends Module{
          'presenca' => 2, // Indicador de presença do comprador no estabelecimento comercial no momento da operação
          'modalidade_frete' => 0, // Modalidade do frete
          'frete' => number_format($order->total_shipping, 2), // Total do frete
-         'desconto' => number_format($order->total_discounts, 2), // Total do desconto
-         'total' => $total_paid // Total do pedido - sem descontos
+         'desconto' => number_format($order->total_discounts_tax_incl, 2), // Total do desconto
+         'total' => number_format($order->total_paid_tax_incl, 2),  // Total do pedido - sem descontos
      );
 
+     //Informações COmplementares ao Fisco
+     $fiscoinf = Configuration::get($this->name.'fisco_inf');
 
+     if(!empty($fiscoinf) && strlen($fiscoinf) <= 2000){
+       $data['pedido']['informacoes_fisco'] = $fiscoinf;
+     }
+
+     //Informações Complementares ao Consumidor
+     $consumidorinf = Configuration::get($this->name.'cons_inf');
+
+     if(!empty($consumidorinf) && strlen($consumidorinf) <= 2000){
+       $data['pedido']['informacoes_complementares'] = $consumidorinf;
+     }
+
+     //Cliente
      if ($tipo_pessoa == 'cpf'){
          $data['cliente'] = array(
              'cpf' => $this->cpf($customer_custom['nfe_document_number']), // (pessoa fisica) Número do CPF
@@ -883,6 +977,22 @@ class WebmaniaBrNFe extends Module{
      foreach ($products as $key => $item){
 
        $product_id = $item['product_id'];
+
+       $ignorar = Db::getInstance()->getValue('SELECT nfe_ignorar_nfe FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
+
+       if($ignorar == '1'){
+         $data['pedido']['total'] -= number_format($item['total_price_tax_incl'], 2);
+
+         foreach($discounts_applied as $percentage){
+           $data['pedido']['total'] += ($percentage/100)*$item['total_price_tax_incl'];
+           $data['pedido']['desconto'] -= ($percentage/100)*$item['total_price_tax_incl'];
+         }
+
+         $data['pedido']['total'] = number_format($data['pedido']['total'], 2);
+         $data['pedido']['desconto'] = number_format($data['pedido']['desconto'], 2);
+
+         continue;
+       }
 
        /*
        * Specific product values
@@ -930,8 +1040,8 @@ class WebmaniaBrNFe extends Module{
          'unidade' => 'UN', // Unidade de medida da quantidade de itens
          'peso' => $peso, // Peso em KG. Ex: 800 gramas = 0.800 KG
          'origem' => ($origem == '00' ? 0 : $origem),//Origem do produto
-         'subtotal' => $subtotal, // Preço unitário do produto - sem descontos
-         'total' => $total_price, // Preço total (quantidade x preço unitário) - sem descontos
+         'subtotal' => number_format($item['unit_price_tax_incl'], 2), // Preço unitário do produto - sem descontos
+         'total' => number_format($item['total_price_tax_incl'], 2), // Preço total (quantidade x preço unitário) - sem descontos
          'classe_imposto' => $imposto // Referência do imposto cadastrado
        );
      }
@@ -968,6 +1078,30 @@ class WebmaniaBrNFe extends Module{
 
     }else{
 
+      $nfe_info = array(
+      'status'       => (string) $response->status,
+      'chave_acesso' => $response->chave,
+      'n_recibo'     => (int) $response->recibo,
+      'n_nfe'        => (int) $response->nfe,
+      'n_serie'      => (int) $response->serie,
+      'url_xml'      => (string) $response->xml,
+      'url_danfe'    => (string) $response->danfe,
+      'data'         => date('d/m/Y'),
+      );
+
+      $existing_nfe_info = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $orderID" ));
+      if(!$existing_nfe_info){
+        $existing_nfe_info = array();
+      }
+
+      $existing_nfe_info[] = $nfe_info;
+
+      $nfe_info_str = serialize($existing_nfe_info);
+
+      if(!Db::getInstance()->update('orders', array('nfe_info' => $nfe_info_str), 'id_order = ' .$orderID )){
+        $this->context->controller->errors[] = Tools::displayError('Erro ao atualizar status da NF-e');
+      }
+
       if(!Db::getInstance()->update('orders', array('nfe_issued' => 1), 'id_order = ' .$orderID )){
         $this->context->controller->errors[] = Tools::displayError('Erro ao alterar status da NF-e #'.$orderID);
       }
@@ -981,6 +1115,41 @@ class WebmaniaBrNFe extends Module{
 
     return true;
 
+  }
+
+  public function updateNFe(){
+    if(Tools::getValue('atualizar') && Tools::getValue('chave')){
+      $chave_acesso = pSql(Tools::getValue('chave'));
+      $order_id = (int) Tools::getValue('id_order');
+      $webmaniabr = new NFe($this->settings);
+      $response = $webmaniabr->consultaNotaFiscal($chave_acesso);
+
+      if (isset($response->error)){
+
+          $this->context->controller->errors[] = Tools::displayError('Erro: '.$response->error);
+          return false;
+
+      }else{
+
+        $new_status = $response->status;
+        $nfe_data = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $order_id" ));
+
+        foreach($nfe_data as &$order_nfe){
+          if($order_nfe['chave_acesso'] == $chave_acesso){
+            $order_nfe['status'] = $new_status;
+          }
+        }
+
+        $nfe_data_str = serialize($nfe_data);
+
+        if(!Db::getInstance()->update('orders', array('nfe_info' => $nfe_data_str),"id_order = '" .$order_id."'  " )){
+          $this->context->controller->errors[] = Tools::displayError('Erro ao atualizar informações da nota');
+        }else{
+          $this->context->controller->confirmations[] = Tools::displayError('NF-e atualizada com sucesso');
+        }
+
+      }
+    }
   }
 
   public function processBulkEmitirNfe(){
@@ -1036,6 +1205,10 @@ class WebmaniaBrNFe extends Module{
         'nfe_issued' => array(
           'name' => 'nfe_issued',
           'sql' => ' ADD COLUMN nfe_issued TINYINT DEFAULT 0'
+        ),
+        'nfe_info' => array(
+          'name' => 'nfe_info',
+          'sql' => ' ADD COLUMN nfe_info TEXT'
         )
       ));
 
@@ -1061,6 +1234,10 @@ class WebmaniaBrNFe extends Module{
           'nfe_product_source' => array(
             'name' => 'nfe_product_source',
             'sql' => ' ADD COLUMN nfe_product_source VARCHAR(3) DEFAULT -1'
+          ),
+          'nfe_ignorar_nfe' => array(
+            'name' => 'nfe_ignorar_nfe',
+            'sql' => ' ADD COLUMN nfe_ignorar_nfe VARCHAR(5) DEFAULT 0'
           )
         ));
 
@@ -1102,7 +1279,7 @@ class WebmaniaBrNFe extends Module{
 
   public function getProductNfeValues($productID){
 
-    $result = Db::getInstance()->ExecuteS('SELECT nfe_tax_class, nfe_ean_bar_code, nfe_ncm_code, nfe_cest_code, nfe_product_source FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$productID);
+    $result = Db::getInstance()->ExecuteS('SELECT nfe_tax_class, nfe_ean_bar_code, nfe_ncm_code, nfe_cest_code, nfe_product_source, nfe_ignorar_nfe FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$productID);
     return $result;
 
   }

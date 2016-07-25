@@ -2,6 +2,12 @@
   <div class="panel product-tab">
     <h3 class="tab">Informações Fiscais (Opcional)</h3>
     <div class="form-group">
+      <label class="control-label col-lg-3" style="text-align:left;max-width:160px;">Ignorar produto ao emitir NFe</label>
+      <div class="col-lg-9">
+        <input type="checkbox" name="nfe_ignorar_nfe" value="1" {if $ignorar_nfe == 1} checked {/if} style="margin-top:20px"/>
+      </div>
+    </div>
+    <div class="form-group">
       <label class="control-label col-lg-3" style="text-align:left;max-width:160px;">Classe de Imposto</label>
       <div class="col-lg-9">
         <input type="text" name="nfe_tax_class" value="{$tax_class}"/>
