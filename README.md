@@ -12,7 +12,7 @@ Através do emissor de Nota Fiscal da WebmaniaBR®, você conta com a emissão e
 - Contrate um dos planos de Nota Fiscal Eletrônica da WebmaniaBR® a partir de R$29,90/mês: [Assine agora mesmo](https://webmaniabr.com/smartsales/nota-fiscal-eletronica/).
 - Instale o módulo grátis do PrestaShop da WebmaniaBR® e configure conforme instruções.
 
-## Instalação do Módulo
+## Instalação
 
 Após realizar o download da última versão ([Clique aqui](https://github.com/webmaniabr/NFePrestaShop/releases)) faça o upload do arquivo no painel de controle da sua loja virtual PrestaShop.
 
@@ -22,7 +22,7 @@ Após realizar o download da última versão ([Clique aqui](https://github.com/w
 <img src="https://webmaniabr.com/atendimento/wp-content/uploads/sites/4/2016/06/img_5771a725955f6.png">
 </p>
 
-## Ativação do Módulo
+## Ativação
 
 - Acesse o menu Extensões > Módulos. Localize o módulo chamado **WebmaniaBR NF-e** e clique no botão Instalar.
 
@@ -34,6 +34,12 @@ Após realizar o download da última versão ([Clique aqui](https://github.com/w
 <img src="https://webmaniabr.com/atendimento/wp-content/uploads/sites/4/2016/06/img_5771a771d14d1.png">
 </p>
 
+## Configuração
+
+Consulte o nosso guia passo a passo para começar a emitir as notas fiscais com apenas um clique na sua Loja Virtual:
+
+- [Guia de emissão de Nota Fiscal para Loja Virtual](https://webmaniabr.com/blog/guia-de-emissao-de-nota-fiscal-para-loja-virtual/)
+
 ## Adaptar página Finalizar Compra
 
 O módulo insere automaticamente os campos obrigatórios na página de Finalizar Compra, Cadastro de novo cliente e Painel de controle para que as notas fiscais sejam emitidas corretamente. Caso possua outros módulos ou tenha adicionado diretamente no tema os campos como CPF, CNPJ, entre outros, precisa ser desativado para que seja utilizado somente o módulo de NFe do PrestaShop.
@@ -44,20 +50,6 @@ O módulo insere automaticamente os campos obrigatórios na página de Finalizar
 - /modules/webmaniabrnfe/js/scripts_fo.1.X.js
 
 Havendo dúvidas de como manusear os arquivos e eventuais incompatibilidades com o seu tema, por favor, entre em contato no e-mail suporte@webmaniabr.com.
-
-## Instruções
-
-**PrestaShop 1.6**
-
-- [Configuração do Módulo NF-e](https://webmaniabr.com/atendimento/nfe/prestashop/configuracao-modulo-nfe-prestashop-16/)
-- [Emissão de NF-e](https://webmaniabr.com/atendimento/nfe/prestashop/emissao-de-nfe-prestashop-16/)
-- [Cadastro de NCM](https://webmaniabr.com/atendimento/nfe/prestashop/cadastro-de-ncm-prestashop-16/)
-
-**PrestaShop 1.5**
-
-- [Configuração do Módulo NF-e](https://webmaniabr.com/atendimento/nfe/prestashop/configuracao-modulo-nfe-prestashop-15/)
-- [Emissão de NF-e](https://webmaniabr.com/atendimento/nfe/prestashop/emissao-de-nfe-prestashop-15/)
-- [Cadastro de NCM](https://webmaniabr.com/atendimento/nfe/prestashop/cadastro-de-ncm-prestashop-15/)
  
 ## Controle das Notas Fiscais
 
