@@ -522,6 +522,7 @@ class WebmaniaBrNFe extends Module{
 
     if(_MAIN_PS_VERSION_ == '1.6'){
       $controller_name = $this->context->controller->controller_name;
+      $this->context->controller->addJquery();
       if($controller_name == 'AdminCustomers'){
         $this->context->controller->addJS($this->_path.'/js/jquery.mask.min.js', 'all');
       }
@@ -532,6 +533,7 @@ class WebmaniaBrNFe extends Module{
     //Support to PS 1.5
     if(_MAIN_PS_VERSION_ == '1.5'){
       $this->rearrangeStates();
+      $this->context->controller->addJquery();
       $controllerName = $this->context->controller->controller_name;
       if(($controllerName == 'AdminOrders' && !Tools::getValue('id_order')) || $controllerName = 'AdminCustomers' || $controllerName = 'AdminAddresses'){
         $this->context->controller->addJS($this->_path.'/js/scripts_bo.1.5.js', 'all');
