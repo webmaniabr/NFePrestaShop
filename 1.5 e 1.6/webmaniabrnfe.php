@@ -72,6 +72,8 @@ class WebmaniaBrNFe extends Module{
       'actionCustomerAccountAdd',
       'displayCustomerAccount',
       'displayInvoice',
+      'displayBackOfficeCategory',
+      'actionCategoryUpdate'
     );
 
     $hooks_1_4 = array(
@@ -514,7 +516,6 @@ class WebmaniaBrNFe extends Module{
   *******************HOOKED FUNCTIONS **********************
   ***********************************************************/
 
-
   public function hookBackOfficeHeader($params){
 
     $this->processBulkEmitirNfe();
@@ -522,7 +523,6 @@ class WebmaniaBrNFe extends Module{
 
     if(_MAIN_PS_VERSION_ == '1.6'){
       $controller_name = $this->context->controller->controller_name;
-      $this->context->controller->addJquery();
       if($controller_name == 'AdminCustomers'){
         $this->context->controller->addJS($this->_path.'/js/jquery.mask.min.js', 'all');
       }
@@ -533,7 +533,6 @@ class WebmaniaBrNFe extends Module{
     //Support to PS 1.5
     if(_MAIN_PS_VERSION_ == '1.5'){
       $this->rearrangeStates();
-      $this->context->controller->addJquery();
       $controllerName = $this->context->controller->controller_name;
       if(($controllerName == 'AdminOrders' && !Tools::getValue('id_order')) || $controllerName = 'AdminCustomers' || $controllerName = 'AdminAddresses'){
         $this->context->controller->addJS($this->_path.'/js/scripts_bo.1.5.js', 'all');
@@ -559,10 +558,11 @@ class WebmaniaBrNFe extends Module{
   public function hookDisplayBackOfficeHeader($params){
 
     $this->hookBackOfficeHeader($params);
-    $this->displayMessageCertificado();
+    //$this->displayMessageCertificado();
 
 
   }
+
 
   public function hookDisplayInvoice($params) {
 
@@ -861,6 +861,22 @@ class WebmaniaBrNFe extends Module{
     return true;
 
   }
+
+  public function hookActionCategoryUpdate( $params ) {
+
+    $category_id = Tools::getValue('id_category');
+    $ncm = Tools::getValue('nfe_category_ncm');
+
+
+    $update_values = array(
+      'nfe_category_ncm'=> pSQL($ncm),
+    );
+
+    if(!Db::getInstance()->autoExecute(_DB_PREFIX_.'category', $update_values, 'UPDATE', 'id_category = ' .(int)$category_id)){
+      $this->errors[] = Db::getInstance()->getMsgError();
+    }
+
+  }
   /**********************************************************
   *******************END HOOKED FUNCTIONS *******************
   ***********************************************************/
@@ -992,9 +1008,11 @@ class WebmaniaBrNFe extends Module{
      }
 
      //produtos
+
      foreach ($products as $key => $item){
 
        $product_id = $item['product_id'];
+       $category_id = $item['id_category_default'];
 
        $ignorar = Db::getInstance()->getValue('SELECT nfe_ignorar_nfe FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
 
@@ -1035,7 +1053,12 @@ class WebmaniaBrNFe extends Module{
        if (!$peso) $peso = '0.100';
        $peso = number_format($peso, 3, '.', '');
        if (!$codigo_ean) $codigo_ean = Configuration::get($this->name.'ean_barcode');
-       if (!$codigo_ncm) $codigo_ncm = Configuration::get($this->name.'ncm_code');
+       if (!$codigo_ncm){
+         $codigo_ncm = $this->get_category_ncm($category_id);
+         if(!$codigo_ncm){
+           $codigo_ncm = Configuration::get($this->name.'ncm_code');
+         }
+       }
        if (!$codigo_cest) $codigo_cest = Configuration::get($this->name.'cest_code');
        if (!is_numeric($origem) || $origem == -1) $origem = Configuration::get($this->name.'product_source');
        if (!$imposto) $imposto = Configuration::get($this->name.'tax_class');
@@ -1067,10 +1090,32 @@ class WebmaniaBrNFe extends Module{
     return $data;
   }
 
+  function get_category_ncm( $id_category ){
+
+    $ncm = false;
+    $category_obj = new CategoryCore($id_category);
+
+    $category_ncm = Db::getInstance()->ExecuteS("SELECT nfe_category_ncm   FROM "._DB_PREFIX_."category_lang WHERE id_category = $id_category" );
+
+    foreach($category_ncm as $ncm_query){
+      if($ncm_query['nfe_category_ncm']){
+        $ncm = $ncm_query['nfe_category_ncm'];
+      }
+    }
+
+    if( isset($category_obj->id_parent) && $category_obj->level_depth > 2 && !$ncm ){
+      return $this->get_category_ncm( $category_obj->id_parent );
+    }
+
+    return $ncm;
+
+  }
+
   public function emitirNfe($orderID){
 
     $webmaniabr = new NFe($this->settings);
     $data = $this->getOrderData($orderID);
+
     $response = $webmaniabr->emissaoNotaFiscal( $data );
 
     if (isset($response->error) || $response->status == 'reprovado'){
@@ -1289,7 +1334,17 @@ class WebmaniaBrNFe extends Module{
               )
             ));
 
-      return array($ordersColumnsToAdd, $productsColumnsToAdd, $addressColumnsToAdd, $customerColumnsToAdd);
+            $categoryColumnsToAdd = array(
+              'table_name' => 'category_lang',
+              'columns' => array(
+                'nfe_category_ncm' => array(
+                  'name' => 'nfe_category_ncm',
+                  'sql'  => ' ADD COLUMN nfe_category_ncm VARCHAR(20)'
+                )
+              )
+            );
+
+      return array($ordersColumnsToAdd, $productsColumnsToAdd, $addressColumnsToAdd, $customerColumnsToAdd, $categoryColumnsToAdd);
 
   }
 
