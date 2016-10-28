@@ -546,7 +546,7 @@ class WebmaniaBrNFe extends Module{
     if(_MAIN_PS_VERSION_ == '1.4'){
 
       $this->updateProduct14();
-      $this->displayMessageSefaz();
+
       $this->displayMessageCertificado();
       return '<link rel="stylesheet" type="text/css" href="'.$this->_path.'/views/css/style.css" />
                 <script src="'.$this->_path.'/js/scripts_bo.1.4.js"></script>';
@@ -560,13 +560,14 @@ class WebmaniaBrNFe extends Module{
 
     $this->hookBackOfficeHeader($params);
     $this->displayMessageCertificado();
-    $this->displayMessageSefaz();
+
 
   }
 
   public function hookDisplayInvoice($params) {
 
     $order_id = $params['id_order'];
+
     $nfe_info = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $order_id" ));
 
     $url  = 'index.php?controller=AdminOrders&id_order='.$order_id;
@@ -598,7 +599,22 @@ class WebmaniaBrNFe extends Module{
         'nfe_info_arr' => $nfe_info,
         'url' => $url,
       ));
-      return $this->display(__FILE__, 'nfe_info_table.tpl');
+      echo  $this->display(__FILE__, 'nfe_info_table.tpl');
+
+      $order = new Order($order_id);
+      $customer_id = $order->id_customer;
+      $delivery_address_id = $order->id_address_delivery;
+      $invoice_address_id = $order->id_address_invoice;
+
+      $address_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$delivery_address_id);
+      $state = new State($address_custom['id_state']);
+      $this->context->smarty->assign(array(
+        'user_address_info' => $address_custom,
+        'state' => $state->iso_code,
+      ));
+
+      echo $this->display(__FILE__, 'user_address_info.tpl');
+
     }
 
   }
@@ -1425,49 +1441,9 @@ class WebmaniaBrNFe extends Module{
 
   }
 
-  public function getStatusSefaz(){
 
-    if(_MAIN_PS_VERSION_ == '1.4'){
-      $cookie = new Cookie('sefaz_cookie', time() + 60*60);
-    }else{
-      $cookie = new Cookie('sefaz_cookie');
-    }
 
-    if(!$cookie->sefazStatus){
-      if(_MAIN_PS_VERSION_ != '1.4'){
-        $cookie->setExpire(time() + 60*60);
-      }
 
-      $webmaniabr = new NFe($this->settings);
-
-      $response = $webmaniabr->statusSefaz();
-      if(is_object($response)) return $response;
-      $cookie->sefazStatus = $response;
-    }
-
-    return $cookie->sefazStatus;
-
-  }
-
-  public function displayMessageSefaz(){
-
-    $status = $this->getStatusSefaz();
-    if(isset($status->error)) {
-      return false;
-    }
-
-    if(!$status){
-      if(_MAIN_PS_VERSION_ == '1.4'){
-        echo $this->displayError('Sefaz Offline: A emissão de NF-e encontra-se temporariamente desativada');
-      }else{
-        $this->context->controller->errors[] = Tools::displayError('Sefaz Offline: A emissão de NF-e encontra-se temporariamente desativada');
-      }
-
-    }
-
-    return true;
-
-  }
 
   public function rearrangeStates(){
 
