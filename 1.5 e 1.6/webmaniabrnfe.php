@@ -558,7 +558,7 @@ class WebmaniaBrNFe extends Module{
   public function hookDisplayBackOfficeHeader($params){
 
     $this->hookBackOfficeHeader($params);
-    //$this->displayMessageCertificado();
+    $this->displayMessageCertificado();
 
 
   }
