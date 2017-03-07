@@ -10,6 +10,35 @@ jQuery(document).ready(function(){
   ***********************NAMESPACE DEFINITIONS*********************
   *****************************************************************/
 
+  var AccountControllerWmbr = {
+    utils: {
+      validateFields : function() {
+
+        var tipoPessoa = $('input[name="document_type"]:checked').val();
+        var requiredFields = [];
+        var emptyFields = [];
+
+        if(tipoPessoa == 'cpf'){
+          requiredFields.push('cpf');
+        }else if(tipoPessoa == 'cnpj'){
+          requiredFields.push('razao_social', 'cnpj', 'cnpj_ie');
+        }
+
+        requiredFields.forEach(function(name, index){
+          var value = $('input[name="'+name+'"]').val().trim();
+          if(!value){
+            emptyFields.push(name);
+          }
+        });
+
+        return emptyFields;
+
+      }
+
+    }
+  };
+
+
   var AddressControllerWmbr = {
     getHTMLElements: {
       addressNumber: function(){
@@ -32,23 +61,39 @@ jQuery(document).ready(function(){
       }
     },
     utils:{
+
+      validateFields: function(){
+
+        var requiredFields = ['address_number', 'address2'];
+        var emptyFields = [];
+
+        requiredFields.forEach(function(name, index){
+          if(!$('input[name="'+name+'"]').val().trim()){
+            emptyFields.push(name);
+          }
+        });
+
+        return emptyFields;
+
+      },
+
       maskDocuments: function(){
         $('#cpf-input').mask('999.999.999-99');
         $('#cnpj-input').mask('99.999.999/9999-99');
         return true;
       },
-      insertElementsInDom: function(){
+
+      insertNumberElementInDOM: function(){
         AddressControllerWmbr.getHTMLElements.addressNumber().insertAfter($('#address1').parent('.form-group'));
+      },
+
+      insertElementsInDom: function(){
+
         AddressControllerWmbr.getHTMLElements.complemento().insertAfter($('#address1').parent('.form-group'));
         AddressControllerWmbr.getHTMLElements.loadingDiv().prependTo($('#add_address'));
         $('#postcode').parent('.form-group').insertAfter($('#company').parent('.form-group'));
       },
-      isPersonTypeOn: function(){
-        if(typeof add_person_fields == 'boolean'){
-          return true;
-        }
-        return false;
-      },
+
       isMaskFieldOn: function(){
         if(typeof mask_doc_fields == 'boolean'){
           return true;
@@ -61,7 +106,9 @@ jQuery(document).ready(function(){
         }
         return false;
       },
+
       getAjaxValues: function(){
+
         if($('#add_address input[name="id_address"]').val() != 0){
           var address_id = $('#add_address input[name="id_address"]').val();
           $.ajax({
@@ -69,12 +116,14 @@ jQuery(document).ready(function(){
             url: baseDir + 'modules/webmaniabrnfe/ajax.php',
             data: {
               method: 'getAddressInfo',
-              addressID: address_id
+              addressID: address_id,
+              adminToken: sec_token,
             },
             success: function(json) {
-              console.log(json);
               result = $.parseJSON(json);
-              $('input[name="address_number"]').val(result[0].address_number);
+              if(typeof result.address_number != 'undefined'){
+                $('input[name="address_number"]').val(result.address_number);
+              }
 
             }
           });
@@ -95,8 +144,12 @@ jQuery(document).ready(function(){
   var address_element = $('body#address');
   if(address_element.length > 0){
 
-    AddressControllerWmbr.utils.insertElementsInDom();
-    AddressControllerWmbr.utils.getAjaxValues();
+    if(numero_compl_status == 'on'){
+      AddressControllerWmbr.utils.insertNumberElementInDOM();
+      AddressControllerWmbr.utils.getAjaxValues();
+    }
+    //AddressControllerWmbr.utils.insertElementsInDom();
+
 
     //Initialize auto field addres after zip code input
     if(AddressControllerWmbr.utils.isAutoAddressOn()){
@@ -124,7 +177,7 @@ jQuery(document).ready(function(){
 
   //Display correct field on radio change (Tipo de Pessoa)
   $(document).on('change', 'input[name="document_type"]', function(){
-    console.log($(this).val());
+
     var rel = $(this).attr('data-rel');
     var target = $('#'+rel+'-field');
     if(!target.hasClass('active')){
@@ -157,9 +210,10 @@ jQuery(document).ready(function(){
         method: 'checkForDoc',
         address_id: addressID
       },
+
       success: function(json) {
         var result = $.parseJSON(json);
-        console.log(result);
+
         if(result.success){
           thisEl.parents('form').submit();
         }else{
@@ -185,6 +239,43 @@ jQuery(document).ready(function(){
         }
       }
     });
-  })
+  });
+
+
+  $('#submitAddress').click(function(e){
+
+    if(typeof add_numero_compl == 'boolean'){
+      var emptyRequiredFields = AddressControllerWmbr.utils.validateFields();
+
+      if(emptyRequiredFields.length > 0){
+        e.preventDefault();
+        var scrollElement = $('input[name="'+emptyRequiredFields[0]+'"]');
+        emptyRequiredFields.forEach(function(name, index){
+          $('input[name="'+name+'"]').addClass('required-error');
+        });
+
+        $('body').scrollTop(scrollElement.offset().top - 100);
+      }
+    }
+
+  });
+
+
+  $(document).on('click', '#submitAccount', function(e){
+
+
+    var emptyRequiredFields = AccountControllerWmbr.utils.validateFields();
+
+    if(emptyRequiredFields.length > 0){
+      e.preventDefault();
+      var scrollElement = $('input[name="'+emptyRequiredFields[0]+'"]');
+      emptyRequiredFields.forEach(function(name, index){
+        $('input[name="'+name+'"]').addClass('required-error');
+      });
+
+      $('body').scrollTop(scrollElement.offset().top - 100);
+    }
+  });
+
 
 });

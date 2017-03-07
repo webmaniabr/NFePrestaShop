@@ -1,15 +1,27 @@
 <?php
 
+
 require_once(dirname(__FILE__).'../../../config/config.inc.php');
 require_once(dirname(__FILE__).'../../../init.php');
+
+if( Tools::getValue('adminToken') != Tools::getAdminToken('7Br2ZZwaRD') ){
+  exit;
+}
+
 switch (Tools::getValue('method')) {
   case 'getAddressInfo' :
+
     $address = new Address(Tools::getValue('addressID'));
-    $result = Db::getInstance()->executeS('SELECT address_number FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
+    $result = Db::getInstance()->getRow('SELECT address_number FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
+
+
     echo json_encode($result);
     break;
     case 'checkForDoc':
+
       $customer_id = Context::getContext()->customer->id;
+      if(is_null($customer_id)) $customer_id = Tools::getValue('id_customer');
+
       checkForDocument(Tools::getValue('address_id'), $customer_id);
       break;
       case 'getNfeStatus':
@@ -33,22 +45,18 @@ switch (Tools::getValue('method')) {
 }
 
 
+
+
 function checkForDocument($address_id, $customer_id){
-  $result_customer = Db::getInstance()->executeS('SELECT nfe_document_number FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer_id);
-  $result_address = Db::getInstance()->executeS('SELECT address_number FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address_id);
+  $result_customer = Db::getInstance()->executeS('SELECT nfe_document_number, nfe_document_type FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer_id);
 
   $result = array();
 
   if(empty($result_customer[0]['nfe_document_number'])){
     $result['document_number'] = 'error';
-  }
-
-  if(empty($result_address[0]['address_number'])){
-    $result['nfe_number'] = 'error';
-  }
-
-  if(!isset($result['document_number']) && !isset($result['address_number'])){
-    $result['success'] = 'success';
+  }else{
+    $result['document_number'] = $result_customer[0]['nfe_document_number'];
+    $result['document_type'] = $result_customer[0]['nfe_document_type'];
   }
 
   echo json_encode($result);

@@ -38,6 +38,11 @@ form.webmaniabrnfe label{
   background-color:#d9534f;
 }
 
+.required-error{
+  color: #a94442;
+  background-color: #f2dede;
+  border-color: #ebccd1;
+}
 
 
 /*************PS 1.5***********/

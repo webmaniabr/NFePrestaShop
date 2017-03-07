@@ -2,7 +2,7 @@
 <module>
 	<name>webmaniabrnfe</name>
 	<displayName><![CDATA[WebmaniaBR NF-e]]></displayName>
-	<version><![CDATA[1.0.0]]></version>
+	<version><![CDATA[2.1]]></version>
 	<description><![CDATA[M&oacute;dulo de emiss&atilde;o de Nota Fiscal Eletr&ocirc;nica para PrestaShop atrav&eacute;s da REST API da WebmaniaBR&reg;.]]></description>
 	<author><![CDATA[WebmaniaBR]]></author>
 	<tab><![CDATA[administration]]></tab>

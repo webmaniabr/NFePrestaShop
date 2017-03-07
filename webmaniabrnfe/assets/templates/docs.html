@@ -1,0 +1,39 @@
+<div class="form-group">
+  <label class="control-label col-lg-3 required">Tipo de pessoa:</label>
+  <div class="col-lg-9">
+    <div class="radio-inline">
+      <label class="top">
+        <span><input type="radio" name="document_type" class="radio-cpf" data-rel="cpf" value="cpf" checked/></span>
+        Pessoa Física
+      </label>
+    </div>
+    <div class="radio-inline">
+      <label class="top">
+        <span><input type="radio" name="document_type" class="radio-cnpj" data-rel="cnpj" value="cnpj"/></span>
+        Pessoa Jurídica
+      </label>
+    </div>
+  </div>
+</div>
+
+<div id="cpf-field" class="form-group active">
+  <label class="control-label col-lg-3 required"> CPF</label>
+  <div class="col-lg-4">
+  <input type="text" class="form-control" name="cpf" id="cpf-input"/>
+  </div>
+</div>
+
+<div id="cnpj-field" class="form-group" style="display:none">
+  <div class="form-group">
+    <label class="col-lg-3 control-label required"> CNPJ</label>
+    <div class="col-lg-4">
+    <input type="text" class="form-control" name="cnpj" id="cnpj-input"/>
+  </div>
+  </div>
+  <div class="form-group">
+    <label class="col-lg-3 control-label"> Inscrição estadual</label>
+    <div class="col-lg-4">
+    <input type="text" class="form-control" name="cnpj_ie" id="ie-input"/>
+  </div>
+  </div>
+</div>

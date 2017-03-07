@@ -14,10 +14,10 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.0';
+    $this->version = '2.3';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
-    $this->ps_versions_compliancy = array('min' => '1.4', 'max' => _PS_VERSION_);
+    $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
     $this->bootstrap = true;
 
     //Auth values
@@ -46,11 +46,6 @@ class WebmaniaBrNFe extends Module{
 
   public function install(){
 
-    if(_MAIN_PS_VERSION_ != '1.4'){
-      if(Shop::isFeatureActive()){
-         Shop::setContext(Shop::CONTEXT_ALL);
-       }
-    }
 
     $configValues = $this->getConfigInitValues();
     foreach($configValues as $key => $value){
@@ -64,41 +59,33 @@ class WebmaniaBrNFe extends Module{
       'displayBackOfficeHeader',
       'displayHeader',
       'displayCustomerAccount',
+      'displayCustomerAccountForm',
       'actionPaymentConfirmation',
       'displayAdminProductsExtra',
       'actionProductUpdate',
       'actionAdminOrdersListingFieldsModifier',
       'createAccountForm',
       'actionCustomerAccountAdd',
-      'displayCustomerAccount',
       'displayInvoice',
       'displayBackOfficeCategory',
-      'actionCategoryUpdate'
+      'actionCategoryUpdate',
+      'actionObjectAddressUpdateAfter',
+      'actionObjectAddressAddAfter',
+      'actionObjectCustomerAddAfter',
+      'actionObjectCustomerUpdateAfter',
     );
 
-    $hooks_1_4 = array(
-      'header',
-      'backOfficeHeader',
-      'createAccountForm',
-      'createAccount',
-      'customerAccount',
-    );
+
+    if(_MAIN_PS_VERSION_ == '1.7'){
+      $hooks_main[] = 'additionalCustomerFormFields';
+      $hooks_main[] = 'validateCustomerFormFields';
+    }
 
 
     if(!parent::install() || !$this->alterTable('add')){
       return false;
     }
 
-    if(_MAIN_PS_VERSION_ == '1.4'){
-
-      foreach($hooks_1_4 as $hook){
-        echo $hook;
-        if(!$this->registerHook($hook)){
-          return false;
-        }
-      }
-
-    }else{
 
       foreach($hooks_main as $hook){
         if(!$this->registerHook($hook)){
@@ -106,10 +93,11 @@ class WebmaniaBrNFe extends Module{
         }
       }
 
-    }
+
 
     Configuration::updateValue('PS_GUEST_CHECKOUT_ENABLED', 0);
     return true;
+
   }
 
 
@@ -151,15 +139,7 @@ class WebmaniaBrNFe extends Module{
       $output .= $this->displayConfirmation($this->l('Settings updated'));
     }
 
-    if(_MAIN_PS_VERSION_ == '1.4'){
-      $fields = $this->getConfigInitValues();
-      foreach($fields as $key => $value){
-        $smarty_arr[$key] = Configuration::get($key);
-      }
-      global $smarty;
-      $smarty->assign($smarty_arr);
-      return $this->display(__FILE__, 'views/templates/configuration.1.4.tpl');
-    }
+
     return $output.$this->displayForm();
   }
 
@@ -287,6 +267,7 @@ class WebmaniaBrNFe extends Module{
             ),
           )
         ),
+
         array(
           'type' => 'text',
           'label' => $this->l('Natureza da Operação'),
@@ -318,7 +299,6 @@ class WebmaniaBrNFe extends Module{
           'label' => $this->l('Código CEST'),
           'name' => $this->name.'cest_code',
           'size' => 50,
-
         ),
         array(
           'type' => 'select',
@@ -361,6 +341,133 @@ class WebmaniaBrNFe extends Module{
     );
 
     $fields_form[3]['form'] = array(
+      'legend' => array(
+        'title' => $this->l('Campos obrigatórios (Banco de Dados)'),
+      ),
+
+      'input' => array(
+        array(
+          'type' => 'radio',
+          'label' => $this->l('Ativar campos CPF/CNPJ?'),
+          'name' => $this->name.'cpf_cnpj_status',
+          'values' => array(
+            array(
+              'id' => 'on',
+              'value' => 'on',
+              'label' => $this->l('Ativado'),
+            ),
+            array(
+              'id' => 'off',
+              'value' => 'off',
+              'label' => $this->l('Desativado'),
+            ),
+          )
+        ),
+        array(
+          'type' => 'text',
+          'label' => $this->l('Nome do campo Tipo de Pessoa'),
+          'name' => $this->name.'tipo_cliente_field',
+          'size' => 50,
+        ),
+        array(
+          'type' => 'text',
+          'label' => $this->l('Valor (Pessoa Física)'),
+          'name' => $this->name.'valor_pessoa_fisica',
+          'size' => 50,
+        ),
+        array(
+          'type' => 'text',
+          'label' => $this->l('Valor (Pessoa Jurídica)'),
+          'name' => $this->name.'valor_pessoa_juridica',
+          'size' => 50,
+        ),
+        array(
+          'type' => 'text',
+          'label' => $this->l('Nome do campo CPF'),
+          'name' => $this->name.'cpf_field',
+          'size' => 50,
+        ),
+
+        array(
+          'type' => 'text',
+          'label' => $this->l('Nome do campo CNPJ'),
+          'name' => $this->name.'cnpj_field',
+          'size' => 50,
+        ),
+
+        array(
+          'type' => 'text',
+          'label' => $this->l('Nome do campo Razão Social'),
+          'name' => $this->name.'razao_social_field',
+          'size' => 50,
+        ),
+
+        array(
+          'type' => 'text',
+          'label' => $this->l('Nome do campo Inscrição Estadual'),
+          'name' => $this->name.'cnpj_ie_field',
+          'size' => 50,
+        ),
+
+        array(
+          'type' => 'radio',
+          'label' => $this->l('Ativar campo Número?'),
+          'name' => $this->name.'numero_compl_status',
+          'values' => array(
+            array(
+              'id' => 'on',
+              'value' => 'on',
+              'label' => $this->l('Ativado'),
+            ),
+            array(
+              'id' => 'off',
+              'value' => 'off',
+              'label' => $this->l('Desativado'),
+            ),
+          )
+        ),
+
+        array(
+          'type' => 'text',
+          'label' => $this->l('Nome do campo Número (Endereço)'),
+          'name' => $this->name.'numero_field',
+          'size' => 50,
+        ),
+
+      ),
+
+    );
+
+    if(_MAIN_PS_VERSION_ == '1.7'){
+      $fields_form[3]['form']['input'][] = array(
+
+          'type' => 'radio',
+          'label' => $this->l('Ativar campo Bairro?'),
+          'name' => $this->name.'bairro_status',
+          'values' => array(
+            array(
+              'id' => 'on',
+              'value' => 'on',
+              'label' => $this->l('Ativado'),
+            ),
+            array(
+              'id' => 'off',
+              'value' => 'off',
+              'label' => $this->l('Desativado'),
+            ),
+          )
+
+      );
+
+      $fields_form['3']['form']['input'][] = array(
+        'type' => 'text',
+        'label' => $this->l('Nome do campo Bairro (Endereço)'),
+        'name' => $this->name.'bairro_field',
+        'size' => 50,
+      );
+    }
+
+    $fields_form[4]['form'] = array(
       'legend' => array(
         'title' => $this->l('Opções Adicionais'),
       ),
@@ -405,18 +512,16 @@ class WebmaniaBrNFe extends Module{
     );
 
 
+    $fields_form[5]['form'] = array(
+      'legend' => array(
+        'title' => $this->l('Salvar alteraçoes')
+      ),
+      'submit' => array(
+        'title' => $this->l('Salvar'),
+        'class' => 'button'
+      )
+    );
 
-    if(_MAIN_PS_VERSION_ == '1.6' || _MAIN_PS_VERSION_ == '1.5'){
-      $fields_form[4]['form'] = array(
-        'legend' => array(
-          'title' => $this->l('Salvar alteraçoes')
-        ),
-        'submit' => array(
-          'title' => $this->l('Salvar'),
-          'class' => 'button'
-        )
-      );
-    }
 
 
 
@@ -470,6 +575,20 @@ class WebmaniaBrNFe extends Module{
       $this->name.'fill_address' => Configuration::get($this->name.'fill_address'),
       $this->name.'fisco_inf' => Configuration::get($this->name.'fisco_inf'),
       $this->name.'cons_inf' => Configuration::get($this->name.'cons_inf'),
+      $this->name.'enable_person_type' => Configuration::get($this->name.'enable_person_type'),
+      $this->name.'tipo_cliente_field' => Configuration::get($this->name.'tipo_cliente_field'),
+      $this->name.'cpf_field' => Configuration::get($this->name.'cpf_field'),
+      $this->name.'cnpj_field' => Configuration::get($this->name.'cnpj_field'),
+      $this->name.'razao_social_field' => Configuration::get($this->name.'razao_social_field'),
+      $this->name.'cnpj_ie_field' => Configuration::get($this->name.'cnpj_ie_field'),
+      $this->name.'numero_field' => Configuration::get($this->name.'numero_field'),
+      $this->name.'bairro_status' => Configuration::get($this->name.'bairro_status'),
+      $this->name.'bairro_field' => Configuration::get($this->name.'bairro_field'),
+      $this->name.'complemento_field' => Configuration::get($this->name.'complemento_field'),
+      $this->name.'cpf_cnpj_status' => Configuration::get($this->name.'cpf_cnpj_status'),
+      $this->name.'numero_compl_status' => Configuration::get($this->name.'numero_compl_status'),
+      $this->name.'valor_pessoa_fisica' => Configuration::get($this->name.'valor_pessoa_fisica'),
+      $this->name.'valor_pessoa_juridica' => Configuration::get($this->name.'valor_pessoa_juridica'),
     );
 
   }
@@ -491,14 +610,28 @@ class WebmaniaBrNFe extends Module{
       $this->name.'product_source' => '0',
       $this->name.'person_type_fields' => 'on',
       $this->name.'mask_fields' => 'off',
+      $this->name.'enable_person_type' => 'off',
       $this->name.'fill_address' => 'off',
       $this->name.'fisco_inf' => '',
       $this->name.'cons_inf' => '',
+      $this->name.'tipo_cliente_field' => 'document_type',
+      $this->name.'cpf_field' => 'cpf',
+      $this->name.'cnpj_field' => 'cnpj',
+      $this->name.'razao_social_field' => 'razao_social',
+      $this->name.'cnpj_ie_field' => 'cnpj_ie',
+      $this->name.'cpf_cnpj_status' => 'off',
+      $this->name.'numero_compl_status' => 'off',
+      $this->name.'numero_field' => 'address_number',
+      $this->name.'bairro_field' => 'bairro',
+      $this->name.'complemento_field' => '',
+      $this->name.'valor_pessoa_fisica' => '',
+      $this->name.'valor_pessoa_juridica' => '',
+      $this->name.'bairro_status' => 'off',
     );
 
   }
 
-  // Retrocompatibility 1.4/1.5
+  // Retrocompatibility 1.5
   private function initContext(){
 
     if (class_exists('Context')){
@@ -512,20 +645,44 @@ class WebmaniaBrNFe extends Module{
   }
 
 
+
+
+
   /**********************************************************
   *******************HOOKED FUNCTIONS **********************
   ***********************************************************/
 
   public function hookBackOfficeHeader($params){
 
+
     $this->processBulkEmitirNfe();
     $this->updateNfe();
 
-    if(_MAIN_PS_VERSION_ == '1.6'){
+    if(_MAIN_PS_VERSION_ == '1.6' || _MAIN_PS_VERSION_ == '1.7'){
       $controller_name = $this->context->controller->controller_name;
+      $this->context->controller->addJquery();
       if($controller_name == 'AdminCustomers'){
         $this->context->controller->addJS($this->_path.'/js/jquery.mask.min.js', 'all');
       }
+
+
+      $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
+      $numero_enabled = Configuration::get($this->name.'numero_compl_status');
+
+      if(Tools::getValue('id_customer')){
+        Media::addJsDef(array('id_customer_wmbr' => Tools::getValue('id_customer')));
+      }
+
+      if(Tools::getValue('id_address')){
+        Media::addJsDef(array('id_address_wmbr' => Tools::getValue('id_address')));
+      }
+
+
+      Media::addJsDef(array('tipo_pessoa_enabled' => $cpf_cnpj_status));
+      Media::addJsDef(array('numero_enabled' => $numero_enabled));
+
+      Media::addJsDef(array('sec_token' => Tools::getAdminToken('7Br2ZZwaRD')));
+
       $this->context->controller->addJS($this->_path.'/js/scripts_bo.1.6.js', 'all');
       $this->context->controller->addCSS($this->_path.'/views/css/style.css', 'all');
     }
@@ -541,16 +698,8 @@ class WebmaniaBrNFe extends Module{
       }
     }
 
-    //Support PS 1.4
-    if(_MAIN_PS_VERSION_ == '1.4'){
 
-      $this->updateProduct14();
 
-      $this->displayMessageCertificado();
-      return '<link rel="stylesheet" type="text/css" href="'.$this->_path.'/views/css/style.css" />
-                <script src="'.$this->_path.'/js/scripts_bo.1.4.js"></script>';
-
-    }
 
     return true;
   }
@@ -559,7 +708,6 @@ class WebmaniaBrNFe extends Module{
 
     $this->hookBackOfficeHeader($params);
     $this->displayMessageCertificado();
-
 
   }
 
@@ -619,14 +767,24 @@ class WebmaniaBrNFe extends Module{
 
   }
 
+  public function isDocumentsEnabled() {
 
+    if(Configuration::get($this->name.'cpf_cnpj_status') == 'on'){
+      return true;
+    }
 
-  public function hookHeader($params){
+    return false;
 
-      Tools::addCSS($this->_path.'/views/css/style.css', 'all');
-      Tools::addJS(($this->_path).'js/scripts_fo.1.4.js');
-      Tools::addJS(($this->_path).'js/correios.min.js');
-      Tools::addJS(($this->_path).'js/jquery.mask.min.js');
+  }
+
+  public function setJSCustomFieldsStatus() {
+
+    $fields = array('cpf_cnpj_status', 'numero_compl_status', 'bairro_status', 'mask_fields', 'fill_address');
+
+    foreach($fields as $field){
+      Media::addJsDef(array($field => Configuration::get($this->name.$field)));
+    }
+
   }
 
   public function hookDisplayHeader($params){
@@ -646,17 +804,23 @@ class WebmaniaBrNFe extends Module{
       }
     }
 
-    if(_MAIN_PS_VERSION_ == '1.6'){
+    if(_MAIN_PS_VERSION_ == '1.6' || _MAIN_PS_VERSION_ == '1.7'){
 
       if(Configuration::get($this->name.'mask_fields') == 'on'){
         Media::addJsDef(array('mask_doc_fields' => true));
       }
 
-      if(Configuration::get($this->name.'fill_address') == 'on'){
-        Media::addJsDef(array('fill_address' => true));
-      }
+      //if(Configuration::get($this->name.'fill_address') == 'on'){
+        //Media::addJsDef(array('fill_address' => true));
+      //}
 
-      $this->context->controller->addJS($this->_path.'/js/scripts_fo.1.6.js', 'all');
+
+      $this->setJSCustomFieldsStatus();
+      Media::addJsDef(array('sec_token' => Tools::getAdminToken('7Br2ZZwaRD')));
+
+      $this->context->controller->addJS($this->_path.'/js/scripts_fo.'._MAIN_PS_VERSION_.'.js', 'all');
+
+
     }
 
     $this->context->controller->addJS($this->_path.'/js/correios.min.js', 'all');
@@ -731,64 +895,10 @@ class WebmaniaBrNFe extends Module{
 
   }
 
-  public function updateProduct14(){
 
-    $product_id = Tools::getValue('id_product');
-    if(Tools::isSubmit('submitCustomProduct14')){
-      $product_id = Tools::getValue('id_product');
-      $update_values = array(
-        'nfe_tax_class'=> pSQL(Tools::getValue('nfe_tax_class')),
-        'nfe_ean_bar_code' => pSQL(Tools::getValue('nfe_ean_bar_code')),
-        'nfe_ncm_code' => pSQL(Tools::getValue('nfe_ncm_code')),
-        'nfe_cest_code' => pSQL(Tools::getValue('nfe_cest_code')),
-        'nfe_product_source' => pSQL(Tools::getValue('nfe_product_source'))
-      );
 
-      if(!Db::getInstance()->autoExecute(_DB_PREFIX_.'product', $update_values, 'UPDATE', 'id_product = ' .(int)$product_id)){
-        $this->errors[] = Db::getInstance()->getMsgError();
-      }
-    }
 
-  }
-
-  public function hookcreateAccountForm(){
-
-      if(_MAIN_PS_VERSION_ == '1.4'){
-        return $this->display(__FILE__, '/views/templates/hook/document_types.1.4.tpl');
-      }
-
-      if(_MAIN_PS_VERSION_ == '1.5'){
-        return $this->display(__FILE__, 'document_types.1.5.tpl');
-
-        if(Configuration::get($this->name.'mask_fields') == 'on'){
-          $var = 'on';
-        }else{
-          $var = 'off';
-        }
-
-        $this->smarty->assign('custom_var', $var);
-      }
-
-      if(_MAIN_PS_VERSION_ == '1.6'){
-
-        if(Configuration::get($this->name.'mask_fields') == 'on'){
-          $var = 'on';
-        }else{
-          $var = 'off';
-        }
-
-        $this->smarty->assign('custom_var', $var);
-
-        return $this->display(__FILE__, 'document_types.1.6.tpl');
-      }
-
-  }
-
-  public function hookActionCustomerAccountAdd($params){
-
-    $customer_data = $params['_POST'];
-    $customer_id = (int)$params['newCustomer']->id;
-    $DB_data = array();
+  public function createCustomerDocument( $customer_id, $customer_data ) {
 
     if($customer_data['document_type'] == 'cpf'){
       $DB_data = array(
@@ -810,7 +920,245 @@ class WebmaniaBrNFe extends Module{
 
   }
 
+  public function hookActionCustomerAccountAdd($params){
+
+    $customer_data = array();
+    $customer_id = (int)$params['newCustomer']->id;
+
+    if(_MAIN_PS_VERSION_ == '1.6'){
+      $data = $params['_POST'];
+      $customer_data = array(
+        'document_type' => $data['document_type'],
+        'cpf'           => $data['cpf'],
+        'cnpj'          => $data['cnpj'],
+        'razao_social'  => $data['razao_social'],
+        'cnpj_ie'       => $data['cnpj_ie'],
+      );
+    }else if(_MAIN_PS_VERSION_ == '1.7'){
+      $customer_data = array(
+        'document_type' => Tools::getValue('document_type'),
+        'cpf'           => Tools::getValue('cpf'),
+        'cnpj'          => Tools::getValue('cnpj'),
+        'razao_social'  => Tools::getValue('razao_social'),
+        'cnpj_ie'       => Tools::getValue('cnpj_ie'),
+      );
+    }
+
+
+    $this->createCustomerDocument($customer_id, $customer_data);
+
+  }
+
+
+  //ADD CPF/CNPJ IN Registration Form
+  public function hookcreateAccountForm(){
+
+    $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
+
+
+      if(_MAIN_PS_VERSION_ == '1.5'){
+        return $this->display(__FILE__, 'document_types.1.5.tpl');
+
+        if(Configuration::get($this->name.'mask_fields') == 'on'){
+          $var = 'on';
+        }else{
+          $var = 'off';
+        }
+
+        $this->smarty->assign('custom_var', $var);
+      }
+
+      if(_MAIN_PS_VERSION_ == '1.6' || _MAIN_PS_VERSION_ == '1.7'){
+
+        if(Configuration::get($this->name.'mask_fields') == 'on'){
+          $var = 'on';
+        }else{
+          $var = 'off';
+        }
+
+        $this->smarty->assign('custom_var', $var);
+
+        if($cpf_cnpj_status == 'on'){
+          return $this->display(__FILE__, 'document_types.1.6.tpl');
+        }
+
+      }
+
+  }
+
+  /* 1.7 Only */
+  public function hookValidateCustomerFormFields( $params ){
+
+    if(!$this->isDocumentsEnabled()) return $params;
+
+    $fields = $params['fields'];
+    $tipo_pessoa = $fields[0]->getValue();
+    $array_set = array();
+
+    if($tipo_pessoa == 'cpf'){
+      $array_set = array('cpf');
+    }else if($tipo_pessoa == 'cnpj'){
+      $array_set = array('cnpj', 'razao_social');
+    }
+
+    foreach($fields as $key => $field){
+
+      if(in_array($field->getName(), $array_set)){
+        $fields[$key]->setRequired(true);
+      }
+
+    }
+
+
+    $params['fields'] = $fields;
+
+    return $params;
+
+  }
+
+  public function getCustomerNfeInfo( $id_customer ){
+
+    $result = Db::getInstance()->getRow('SELECT nfe_document_number, nfe_document_type, nfe_razao_social, nfe_pj_ie FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$id_customer);
+
+    return $result;
+
+  }
+
+
+  /* 1.7 Only */
+  public function hookAdditionalCustomerFormFields($params){
+
+    if(!$this->isDocumentsEnabled()) return array();
+
+    $id_customer = $this->context->customer->id;
+    $nfe_info = $this->getCustomerNfeInfo($id_customer);
+
+    $values = array(
+      'cpf'      => '',
+      'cnpj'     => '',
+      'tipo'     => 'cpf',
+      'ie'       => '',
+      'r_social' => '',
+    );
+
+    if($nfe_info){
+      $values['tipo'] = $nfe_info['nfe_document_type'];
+
+      if($values['tipo'] == 'cpf'){
+        $values['cpf'] = $nfe_info['nfe_document_number'];
+      }else if($values['tipo'] == 'cnpj'){
+        $values['cnpj'] = $nfe_info['nfe_document_number'];
+        $values['r_social'] = $nfe_info['nfe_razao_social'];
+        $values['ie'] = $nfe_info['nfe_pj_ie'];
+      }
+
+
+    }
+
+    $fields = array();
+
+    $map = array(
+
+      'tipo_pessoa' => array(
+        'name'     => 'document_type',
+        'type'     => 'radio-buttons',
+        'required' => true,
+        'label'    => 'Tipo de Pessoa',
+        'value' => $values['tipo'],
+        'values'   => array(
+          'cpf'  => 'Pessoa Física',
+          'cnpj' => 'Pessoa Jurídica',
+        )
+      ),
+
+      'cpf' => array(
+        'name'     => 'cpf',
+        'type'     => 'text',
+        'required' => false,
+        'label'    => 'CPF',
+        'value'    => $values['cpf'],
+      ),
+
+      'cnpj' => array(
+        'name'     => 'cnpj',
+        'type'     => 'text',
+        'required' => false,
+        'label'    => 'CNPJ',
+        'value'    => $values['cnpj'],
+      ),
+
+      'razao_social' => array(
+        'name'     => 'razao_social',
+        'type'     => 'text',
+        'required' => false,
+        'label'    => 'Razão Social',
+        'value'    => $values['r_social'],
+      ),
+
+      'ie' => array(
+        'name'     => 'cnpj_ie',
+        'type'     => 'text',
+        'required' => false,
+        'label'    => 'Inscrição Estadual',
+        'value'    => $values['ie'],
+      ),
+
+    );
+
+    foreach($map as $field){
+
+      $object = new FormField();
+      $object->setName($field['name']);
+      $object->setType($field['type']);
+      $object->setRequired($field['required']);
+      $object->setLabel($field['label']);
+
+      if(isset($field['value'])){
+        $object->setValue($field['value']);
+      }
+
+      if(isset($field['values'])){
+        $object->setAvailableValues($field['values']);
+      }
+      $fields[] = $object;
+    }
+
+
+    return $fields;
+  }
+
+  public function hookDisplayCustomerAccountForm(){
+
+    if(_MAIN_PS_VERSION_ == '1.7') return false;
+
+
+      if(_MAIN_PS_VERSION_ == '1.6'){
+
+        if(Configuration::get($this->name.'mask_fields') == 'on'){
+          $var = 'on';
+        }else{
+          $var = 'off';
+        }
+
+        $this->smarty->assign('custom_var', $var);
+
+        if($this->isDocumentsEnabled()){
+          if(_MAIN_PS_VERSION_ == '1.6'){
+            return $this->display(__FILE__, 'document_types.1.6.tpl');
+          }else if(_MAIN_PS_VERSION_ == '1.7'){
+            echo $this->display(__FILE__, 'document_types.1.7.tpl');
+          }
+
+        }
+
+      }
+
+  }
+
+  //ADD "EDIT CPF/CNPJ" on My Account Page
   public function hookDisplayCustomerAccount(){
+
+      $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
 
       if(_MAIN_PS_VERSION_ == '1.5'){
         $redirect_url = $this->context->link->getModuleLink('webmaniabrnfe','view15');
@@ -819,9 +1167,13 @@ class WebmaniaBrNFe extends Module{
       }
 
       if(_MAIN_PS_VERSION_ == '1.6'){
-        $redirect_url = $this->context->link->getModuleLink('webmaniabrnfe','view16');
-        $this->smarty->assign('redirect_url', $redirect_url);
-        return $this->display(__FILE__, 'account_list_item.1.6.tpl');
+
+        if($cpf_cnpj_status == 'on'){
+          $redirect_url = $this->context->link->getModuleLink('webmaniabrnfe','view16');
+          $this->smarty->assign('redirect_url', $redirect_url);
+          return $this->display(__FILE__, 'account_list_item.1.6.tpl');
+        }
+
       }
 
   }
@@ -877,9 +1229,193 @@ class WebmaniaBrNFe extends Module{
     }
 
   }
-  /**********************************************************
-  *******************END HOOKED FUNCTIONS *******************
-  ***********************************************************/
+
+  public function updateAddressInfo( $address_id ){
+
+    $number_status = Configuration::get($this->name.'numero_compl_status');
+    $update_values = array();
+    $context_type = Context::getContext()->controller->controller_type;
+
+    if($number_status == 'on' || $context_type == 'admin'){
+      $number = Tools::getValue('address_number');
+    }else{
+      $number = Tools::getValue(Configuration::get($this->name.'numero_field'));
+    }
+
+    if($number){
+      $update_values = array(
+        'address_number'=> pSQL($number),
+      );
+    }
+
+
+    if(_MAIN_PS_VERSION_ == '1.7'){
+
+      $bairro_status = Configuration::get($this->name.'bairro_status');
+      if($bairro_status == 'on'){
+        $bairro = Tools::getValue('bairro');
+      }else{
+        $bairro = Tools::getValue(Configuration::get($this->name.'bairro_field'));
+      }
+
+      if($bairro){
+        $update_values['bairro'] = pSQL($bairro);
+      }
+
+    }
+
+
+    if(!empty($update_values)){
+      if(!Db::getInstance()->update('address', $update_values, 'id_address = ' .(int)$address_id)){
+        $this->errors[] = Db::getInstance()->getMsgError();
+      }
+    }
+
+  }
+
+  public function hookActionObjectAddressUpdateAfter( $params ) {
+
+    $address_id = $params['object']->id;
+    $this->updateAddressInfo($address_id);
+
+  }
+
+  public function hookActionObjectAddressAddAfter( $params ) {
+
+    $address_id = $params['object']->id;
+    $this->updateAddressInfo($address_id);
+
+  }
+
+
+
+  public function updateCustomerDocument( $customer_id ) {
+
+    $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
+    $update_values = array();
+    $context_type = Context::getContext()->controller->controller_type;
+
+
+    if($cpf_cnpj_status == 'on' || $context_type == 'admin'){
+      $fields = array(
+        'tipo_pessoa'  => 'document_type',
+        'cpf'          => 'cpf',
+        'cnpj'         => 'cnpj',
+        'razao_social' => 'razao_social',
+        'ie'           => 'cnpj_ie'
+      );
+    }else{
+      $fields = array(
+        'tipo_pessoa'  => Configuration::get($this->name.'tipo_cliente_field'),
+        'cpf'          => Configuration::get($this->name.'cpf_field'),
+        'cnpj'         => Configuration::get($this->name.'cnpj_field'),
+        'razao_social' => Configuration::get($this->name.'razao_social_field'),
+        'ie'           => Configuration::get($this->name.'cnpj_ie_field'),
+      );
+    }
+
+    $type = Tools::getValue($fields['tipo_pessoa']);
+    $cpf_ref = 'cpf';
+    $cnpj_ref = 'cnpj';
+
+    if($cpf_cnpj_status == 'off' && $context_type != 'admin'){
+      $cpf_ref = Configuration::get($this->name.'valor_pessoa_fisica');
+      $cnpj_ref = Configuration::get($this->name.'valor_pessoa_juridica');
+    }
+
+    if($type){
+
+      if($type == $cpf_ref){
+        $update_values = array(
+          'nfe_document_type' => 'cpf',
+        );
+      }else if($type == $cnpj_ref){
+        $update_values = array(
+          'nfe_document_type' => 'cnpj',
+        );
+      }
+
+    }
+
+    if($type == $cpf_ref){
+      if(Tools::getValue($fields['cpf'])){
+        $update_values['nfe_document_number'] = pSQL(Tools::getValue($fields['cpf']));
+      }
+
+    }else if($type == $cnpj_ref){
+      if(Tools::getValue($fields['cnpj'])){
+        $update_values['nfe_document_number'] = pSQL(Tools::getValue($fields['cnpj']));
+      }
+
+      if(Tools::getValue($fields['razao_social'])){
+        $update_values['nfe_razao_social'] = pSQL(Tools::getValue($fields['razao_social']));
+      }
+
+      if(Tools::getValue($fields['ie'])){
+        $update_values['nfe_pj_ie'] = pSQL(Tools::getValue($fields['ie']));
+      }
+    }
+
+    /***********
+
+    One Page Checkout Values
+
+    $fields_opc = json_decode(Tools::getValue('fields_opc')), true);
+
+    $tipo_cliente_field = Configuration::get($this->name.'tipo_cliente_field')
+    $cpf_field_name = Configuration::get($this->name.'cpf_field');
+    $cnpj_field_name = Configuration::get($this->name.'cnpj_field');
+    $razao_social_field = Configuration::get($this->name.'razao_social_field');
+    $ie_field = Configuration::get($this->name.'cnpj_ie_field');
+
+
+    foreach($fields_opc as $opc_field){
+      switch($opc_field['name']){
+        case $tipo_cliente_field:
+        $update_values['nfe_document_type'] = $opc_field['value'];
+        break;
+        case $cpf_field_name:
+        case $cnpj_field:
+        $update_values['nfe_document_number'] = $opc_field['value'];
+        break;
+        case $razao_socal_field:
+        $update_values['nfe_razao_social'] = $opc_field['value'];
+        break;
+        case $ie_field:
+        $update_values['nfe_pj_ie'] = $opc_field['value'];
+        break;
+      }
+    }
+
+    *************/
+
+    if(!empty($update_values)){
+
+      if(!Db::getInstance()->update('customer', $update_values, 'id_customer="'.(int)$customer_id.'"')){
+        $this->errors[] = Db::getInstance()->getMsgError();
+      }
+
+    }
+
+  }
+
+
+  public function hookActionObjectCustomerUpdateAfter( $params ){
+
+    $customer_id = $params['object']->id;
+    $this->updateCustomerDocument($customer_id);
+
+  }
+
+  public function hookActionObjectCustomerAddAfter( $params ){
+
+    $customer_id = $params['object']->id;
+    $this->updateCustomerDocument($customer_id);
+
+  }
+  /*********************** END HOOKED FUNCTIONS **************************/
+
+
 
   public function checkCURL(){
 
@@ -929,18 +1465,22 @@ class WebmaniaBrNFe extends Module{
       }
     }
 
-    //Version Compliance
-    if(_MAIN_PS_VERSION_ == '1.4'){
-      $customer = new Customer($order->id_customer);
-    }else{
+
       $customer = $order->getCustomer();
-    }
+
+
+
 
     $address = new Address($order->id_address_delivery);
     $state = new State($address->id_state);
     $products = $order->getProducts();
     $customer_custom = Db::getInstance()->getRow('SELECT nfe_document_type, nfe_document_number, nfe_razao_social, nfe_pj_ie FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
     $address_custom = Db::getInstance()->getRow('SELECT address_number FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
+
+    if(_MAIN_PS_VERSION_ == '1.7'){
+      $address_custom = Db::getInstance()->getRow('SELECT address_number, bairro FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
+    }
+
     $tipo_pessoa = $customer_custom['nfe_document_type'];
     $data = array(
         'ID' => $order->id, // Número do pedido
@@ -975,7 +1515,7 @@ class WebmaniaBrNFe extends Module{
        $data['pedido']['informacoes_complementares'] = $consumidorinf;
      }
 
-     //Cliente
+     //Client
      if ($tipo_pessoa == 'cpf'){
          $data['cliente'] = array(
              'cpf' => $this->cpf($customer_custom['nfe_document_number']), // (pessoa fisica) Número do CPF
@@ -1005,6 +1545,11 @@ class WebmaniaBrNFe extends Module{
          'telefone' => $address->phone, // Telefone do cliente
          'email' => $customer->email // E-mail do cliente para envio da NF-e
        );
+     }
+
+     if(_MAIN_PS_VERSION_ == '1.7'){
+       $data['cliente']['bairro'] = $address_custom['bairro'];
+       $data['cliente']['complemento'] = $address->address2;
      }
 
      //produtos
@@ -1063,14 +1608,10 @@ class WebmaniaBrNFe extends Module{
        if (!is_numeric($origem) || $origem == -1) $origem = Configuration::get($this->name.'product_source');
        if (!$imposto) $imposto = Configuration::get($this->name.'tax_class');
 
-       //Version Compliance
-       if(_MAIN_PS_VERSION_ == '1.4'){
-         $subtotal = number_format($item['product_price_wt'], 2);
-         $total_price = number_format($item['total_wt'], 2);
-       }else{
-         $subtotal = number_format($item['unit_price_tax_incl'], 2);
-         $total_price = number_format($item['total_price_tax_incl'], 2);
-       }
+
+        $subtotal = number_format($item['unit_price_tax_incl'], 2);
+        $total_price = number_format($item['total_price_tax_incl'], 2);
+
        $data['produtos'][] = array(
          'nome' => $item['product_name'], // Nome do produto
          'sku' => $item['product_reference'], // Código identificador - SKU
@@ -1111,33 +1652,64 @@ class WebmaniaBrNFe extends Module{
 
   }
 
+  public function get_table_radio_options() {
+
+    $keys = $this->get_customer_columns_listings();
+    $values = array();
+
+    foreach($keys as $key){
+      $values[] = array(
+        'id_option'    => $key,
+        'name' => $key,
+      );
+    }
+
+
+    return $values;
+
+  }
+
+  public function get_customer_columns_listings() {
+
+    $keys = array();
+
+    $exclude = array(
+      'id_customer', 'id_shop_group', 'id_shop', 'id_gender',
+      'id_default_group', 'id_lang', 'id_risk', 'firstname',
+      'lastname', 'email', 'passwd', 'last_passwd_gen',
+      'birthday', 'newsletter', 'ip_registration_newsletter',
+      'newsletter_date_add', 'optin', 'website', 'outstanding_allow_amount',
+      'show_public_prices', 'max_payment_days', 'secure_key', 'note',
+      'active', 'is_guest', 'deleted', 'date_add', 'date_upd', 'siret', 'ape',
+    );
+
+    $columns = Db::getInstance()->executeS('DESCRIBE ps_customer');
+
+    foreach($columns as $col){
+      if(!in_array($col['Field'], $exclude)){
+        $keys[] = $col['Field'];
+      }
+    }
+
+    return $keys;
+  }
+
   public function emitirNfe($orderID){
 
     $webmaniabr = new NFe($this->settings);
     $data = $this->getOrderData($orderID);
-
     $response = $webmaniabr->emissaoNotaFiscal( $data );
 
     if (isset($response->error) || $response->status == 'reprovado'){
 
-      if(_MAIN_PS_VERSION_ == '1.4'){
-        if(isset($response->error)){
-          echo $this->displayError('Erro ao emitir a NF-e do Pedido #'.$orderID.' ( '.$response->error.' )');
-        }elseif(isset($response->log->aProt[0]->xMotivo)){
-          echo $this->displayError('Erro ao emitir a NF-e do Pedido #'.$orderID. '( '.$response->log->aProt[0]->xMotivo.' )');
-        }else{
-          echo $this->displayError('Erro ao emitir a NF-e do Pedido #'.$orderID);
-        }
-      }
-      else{
-        if(isset($response->error)){
-          $this->context->controller->errors[] = Tools::displayError('Erro ao emitir a NF-e do Pedido #'.$orderID.' ( '.$response->error.' )');
+      if(isset($response->error)){
+        $this->context->controller->errors[] = Tools::displayError('Erro ao emitir a NF-e do Pedido #'.$orderID.' ( '.$response->error.' )');
         }elseif(isset($response->log->aProt[0]->xMotivo)){
           $this->context->controller->errors[] = Tools::displayError('Erro ao emitir a NF-e do Pedido #'.$orderID. '( '.$response->log->aProt[0]->xMotivo.' )');
         }else{
           $this->context->controller->errors[] = Tools::displayError('Erro ao emitir a NF-e do Pedido #'.$orderID);
         }
-      }
+
 
     }else{
 
@@ -1169,11 +1741,9 @@ class WebmaniaBrNFe extends Module{
         $this->context->controller->errors[] = Tools::displayError('Erro ao alterar status da NF-e #'.$orderID);
       }
 
-      if(_MAIN_PS_VERSION_ == '1.4'){
-        echo $this->displayConfirmation('NF-e emitida com sucesso do Pedido #'.$orderID);
-      }else{
+
         $this->context->controller->confirmations[] = Tools::displayError('NF-e emitida com sucesso do Pedido #'.$orderID);
-      }
+
     }
 
     return true;
@@ -1240,13 +1810,16 @@ class WebmaniaBrNFe extends Module{
           ${'sql_'.$columnsInfo['table_name']} = "ALTER TABLE " . _DB_PREFIX_ .$columnsInfo['table_name'];
           foreach($columnsInfo['columns'] as $column){
             $columnExists = Db::getInstance()->ExecuteS("SHOW COLUMNS FROM "._DB_PREFIX_.$columnsInfo['table_name']." LIKE '".$column['name']."'");
+
             if(!$columnExists){
+
               ${'sql_'.$columnsInfo['table_name']} .= $column['sql'].',';
               ${'sql_execute_'.$columnsInfo['table_name']} = true;
             }
           }
 
-          if(${'sql_execute_'.$columnsInfo['table_name']} === true){
+          if( isset(${'sql_execute_'.$columnsInfo['table_name']}) && ${'sql_execute_'.$columnsInfo['table_name']} === true ){
+
             if(!Db::getInstance()->Execute(rtrim(${'sql_'.$columnsInfo['table_name']}, ','))){
               $result = false;
             }
@@ -1255,6 +1828,7 @@ class WebmaniaBrNFe extends Module{
         }
         break;
     }
+
 
     return $result;
 
@@ -1311,6 +1885,11 @@ class WebmaniaBrNFe extends Module{
               'name' => 'address_number',
               'sql' => ' ADD COLUMN address_number VARCHAR(15)'
             ),
+            'bairro' => array(
+              'name' => 'bairro',
+              'sql' => ' ADD COLUMN bairro VARCHAR(15)'
+            ),
+
           ));
 
           $customerColumnsToAdd = array(
@@ -1450,11 +2029,9 @@ class WebmaniaBrNFe extends Module{
 
   public function getValidadeCertificado(){
 
-    if(_MAIN_PS_VERSION_ == '1.4'){
-      $cookie = new Cookie('validate_cookie', time() + 60*60*24);
-    }else{
+
       $cookie = new Cookie('validate_cookie');
-    }
+
 
     if(!$cookie->certificadoExpire){
       if(_MAIN_PS_VERSION_ != '1.4'){
@@ -1478,18 +2055,14 @@ class WebmaniaBrNFe extends Module{
     }
 
     if($validade < 45 && $validade >= 1){
-      if(_MAIN_PS_VERSION_ == '1.4'){
-        echo $this->displayError('WebmaniaBR NF-e: Emita um novo Certificado Digital A1 - vencerá em '.$this->getValidadeCertificado().' dias');
-      }else{
+
         $this->context->controller->warnings[] = Tools::displayError('WebmaniaBR NF-e: Emita um novo Certificado Digital A1 - vencerá em '.$this->getValidadeCertificado().' dias');
-      }
+
 
     }else if(!$validade){
-      if(_MAIN_PS_VERSION_ == '1.4'){
-        echo $this->displayError('WebmaniaBR NF-e: Certificado Digital A1 vencido. Emita um novo para continuar operando.');
-      }else{
+
         $this->context->controller->errors[] = Tools::displayError('WebmaniaBR NF-e: Certificado Digital A1 vencido. Emita um novo para continuar operando.');
-      }
+
     }
 
     return true;
