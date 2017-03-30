@@ -6,7 +6,7 @@ jQuery(document).ready(function(){
 
       isCustomerPage: function() {
 
-        if($('#customer_form.AdminCustomers').length > 0){
+        if($('#customer_form').length > 0){
           return true;
         }
 
@@ -16,7 +16,7 @@ jQuery(document).ready(function(){
 
       isAddressPage: function() {
 
-        if($('#address_form.AdminAddresses').length > 0){
+        if($('#address_form').length > 0){
           return true;
         }
 

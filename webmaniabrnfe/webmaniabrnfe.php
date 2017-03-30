@@ -14,11 +14,13 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.3';
+    $this->version = '2.5';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
     $this->bootstrap = true;
+
+    $this->uniq_key = Configuration::get($this->name.'uniq_key');
 
     //Auth values
     $this->settings = array(
@@ -254,6 +256,24 @@ class WebmaniaBrNFe extends Module{
           'label' => $this->l('Emissão Automática'),
           'name' => $this->name.'automatic_emit',
           'desc' => $this->l('Emitir automaticamente a NF-e sempre que que um pagamento for confirmado'),
+          'values' => array(
+            array(
+              'id' => 'on',
+              'value' => 'on',
+              'label' => $this->l('Ativado'),
+            ),
+            array(
+              'id' => 'off',
+              'value' => 'off',
+              'label' => $this->l('Desativado'),
+            ),
+          )
+        ),
+
+        array(
+          'type' => 'radio',
+          'label' => $this->l('Envio automático de email'),
+          'name' => $this->name.'envio_email',
           'values' => array(
             array(
               'id' => 'on',
@@ -589,6 +609,8 @@ class WebmaniaBrNFe extends Module{
       $this->name.'numero_compl_status' => Configuration::get($this->name.'numero_compl_status'),
       $this->name.'valor_pessoa_fisica' => Configuration::get($this->name.'valor_pessoa_fisica'),
       $this->name.'valor_pessoa_juridica' => Configuration::get($this->name.'valor_pessoa_juridica'),
+      $this->name.'uniq_key' => Configuration::get($this->name.'uniq_key'),
+      $this->name.'envio_email' => Configuration::get($this->name.'envio_email'),
     );
 
   }
@@ -627,6 +649,8 @@ class WebmaniaBrNFe extends Module{
       $this->name.'valor_pessoa_fisica' => '',
       $this->name.'valor_pessoa_juridica' => '',
       $this->name.'bairro_status' => 'off',
+      $this->name.'bairro_status' => md5(uniqid(rand(), true)),
+      $this->name.'envio_email' => 'off',
     );
 
   }
@@ -654,7 +678,7 @@ class WebmaniaBrNFe extends Module{
 
   public function hookBackOfficeHeader($params){
 
-
+    $this->listen_notification();
     $this->processBulkEmitirNfe();
     $this->updateNfe();
 
@@ -788,6 +812,9 @@ class WebmaniaBrNFe extends Module{
   }
 
   public function hookDisplayHeader($params){
+
+
+    $this->listen_notification();
 
     if(_MAIN_PS_VERSION_ == '1.5'){
       $controller = get_class($this->context->controller);
@@ -1458,6 +1485,16 @@ class WebmaniaBrNFe extends Module{
     $discounts = $order->getDiscounts(true);
     $discounts_applied = array(); // Only percentage
 
+    $envio_email = Configuration::get($this->name.'envio_email');
+
+    $uniq_key = Configuration::get($this->name.'uniq_key');
+    if(!$uniq_key){
+      $uniq_key = md5(uniqid(rand(), true));
+      Configuration::updateValue($this->name.'uniq_key', $uniq_key);
+    }
+
+
+
     foreach($discounts as $discount){
       $cart_rule = new CartRule($discount['id_cart_rule']);
       if($cart_rule->reduction_percent > 0){
@@ -1484,6 +1521,7 @@ class WebmaniaBrNFe extends Module{
     $tipo_pessoa = $customer_custom['nfe_document_type'];
     $data = array(
         'ID' => $order->id, // Número do pedido
+        'url_notificacao' => Tools::getHttpHost(true).__PS_BASE_URI__.'?retorno_nfe='.$uniq_key.'&order_id='.$order->id,
         'operacao' => 1, // Tipo de Operação da Nota Fiscal
         'natureza_operacao' => Configuration::get($this->name.'operation_type'), // Natureza da Operação
         'modelo' => 1, // Modelo da Nota Fiscal (NF-e ou NFC-e)
@@ -1528,7 +1566,7 @@ class WebmaniaBrNFe extends Module{
              'uf' => $state->iso_code, // Estado do endereço de entrega
              'cep' => $address->postcode, // CEP do endereço de entrega
              'telefone' => $address->phone, // Telefone do cliente
-             'email' => $customer->email // E-mail do cliente para envio da NF-e
+             'email' => ($envio_email == 'on' ? $customer->email : '') // E-mail do cliente para envio da NF-e
          );
      }else if($tipo_pessoa == 'cnpj'){
        $data['cliente'] = array(
@@ -1543,7 +1581,7 @@ class WebmaniaBrNFe extends Module{
          'uf' => $state->iso_code, // Estado do endereço de entrega
          'cep' => $address->postcode, // CEP do endereço de entrega
          'telefone' => $address->phone, // Telefone do cliente
-         'email' => $customer->email // E-mail do cliente para envio da NF-e
+         'email' => ($envio_email == 'on' ? $customer->email : '') // E-mail do cliente para envio da NF-e
        );
      }
 
@@ -1698,6 +1736,7 @@ class WebmaniaBrNFe extends Module{
 
     $webmaniabr = new NFe($this->settings);
     $data = $this->getOrderData($orderID);
+
     $response = $webmaniabr->emissaoNotaFiscal( $data );
 
     if (isset($response->error) || $response->status == 'reprovado'){
@@ -2372,6 +2411,46 @@ class WebmaniaBrNFe extends Module{
         }
       }
     }
+  }
+
+  function listen_notification() {
+
+    if($_SERVER['REQUEST_METHOD'] === 'POST' && $_GET['retorno_nfe'] && $_GET['order_id']){
+
+      $order_id = (int) $_GET['order_id'];
+      $uniq_key = Configuration::get($this->name.'uniq_key');
+
+      if($_GET['retorno_nfe'] == $uniq_key){
+
+        $order_nfe_info = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $order_id" ));
+
+        if(!$order_nfe_info) $order_nfe_info = array();
+
+        foreach($order_nfe_info as $key => $nfe){
+
+          $numero_nfe = $nfe['n_nfe'];
+
+          $current_status = $nfe['status'];
+          $received_status = $_POST['status'];
+
+          if($numero_nfe == $_POST['nfe'] && $current_status != $received_status){
+
+            $order_nfe_info[$key]['status'] = $received_status;
+            $nfe_info_str = serialize($order_nfe_info);
+
+            if(!Db::getInstance()->update('orders', array('nfe_info' => $nfe_info_str), 'id_order = ' .$order_id )){
+              $this->context->controller->errors[] = Tools::displayError('Erro ao atualizar status da NF-e');
+            }
+            break;
+          }
+
+
+        }
+
+      }
+
+    }
+
   }
 
 }

@@ -187,59 +187,7 @@ jQuery(document).ready(function(){
     }
   });
 
-  /*
-  Make sure that users who signed up before the module was installed cannot checkout without
-  registering document number and address number
-  */
-  $('.cart_navigation button[name="processAddress"]').click(function(e){
-    e.preventDefault();
-    var thisEl = $(this);
-    var sameAddress = $('#addressesAreEquals');
-    var addressID = null;
-    if(sameAddress.is(':checked')){
-      addressID = $('#id_address_delivery').val();
-    }else{
-      addressID = $('#id_address_invoice').val();
-    }
-
-    $.ajax({
-      type: 'POST',
-      async: true,
-      url: baseDir + 'modules/webmaniabrnfe/ajax.php',
-      data: {
-        method: 'checkForDoc',
-        address_id: addressID
-      },
-
-      success: function(json) {
-        var result = $.parseJSON(json);
-
-        if(result.success){
-          thisEl.parents('form').submit();
-        }else{
-          if(result.document_number == 'error'){
-            var error = $('#no-document');
-            if(error.length == 0){
-              var insertElement = '<div class="alert alert-warning" id="no-document" role="alert">'+
-              'Você não possui nenhum CPF ou CNPJ cadastrado. Atualize as informações na sua conta.</div>';
-              $(insertElement).prependTo('.addresses');
-            }
-          }
-
-          if(result.nfe_number == 'error'){
-            var error = $('#no-address');
-            if(error.length == 0){
-              var insertElement = '<div class="alert alert-warning" id="no-address" role="alert">'+
-              'Se você deseja usar este endereço, atualize-o incluindo o número do enderço. Caso você tenha definido o número juntamente ao endereço separado por vírgula, por favor, atualize-o e insira o número no campo "Número".</div>';
-              $(insertElement).prependTo('.addresses');
-            }
-          }
-
-          $("html, body").animate({ scrollTop: $('.addresses.clearfix').offset().top }, 1000);
-        }
-      }
-    });
-  });
+  
 
 
   $('#submitAddress').click(function(e){
