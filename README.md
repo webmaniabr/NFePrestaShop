@@ -39,14 +39,6 @@ Após realizar o download da última versão ([Clique aqui](https://github.com/w
 - [Emissão de notas fiscais para pedidos antigos](https://ajuda.webmaniabr.com/nota-fiscal-eletronica-configuracoes-e-gerenciamento/modulo-prestashop/instalacao-prestashop-emissao-de-notas-fiscais-para-pedidos-antigos)
 - [Como o módulo deve ser atualizado?](https://ajuda.webmaniabr.com/nota-fiscal-eletronica-configuracoes-e-gerenciamento/modulo-prestashop/instalacao-prestashop-como-o-modulo-deve-ser-atualizado)
 
-## Controle das Notas Fiscais
-
-Você pode gerenciar todas as Notas Fiscais e realizar a impressão do Danfe no painel da WebmaniaBR®. Simples e fácil.
-
-<p align="center">
-<img src="https://webmaniabr.com/wp-content/themes/wmbr/img/nf07.jpg">
-</p>
-
 ## Suporte
 
-Qualquer dúvida entre em contato na nossa [Central de Ajuda](https://ajuda.webmaniabr.com) ou [Abra um chamado](https://webmaniabr.zendesk.com/hc/pt-br/requests).
+Qualquer dúvida entre em contato na nossa [Central de Ajuda](https://ajuda.webmaniabr.com) ou acesse o [Painel de Controle](https://webmaniabr.com/painel/) para conversar em tempo real no Chat ou Abrir um chamado.
