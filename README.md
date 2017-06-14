@@ -32,14 +32,9 @@ Após realizar o download da última versão ([Clique aqui](https://github.com/w
 <img src="https://webmaniabr.com/atendimento/wp-content/uploads/sites/4/2016/06/img_5771a771d14d1.png">
 </p>
 
-## Configuração das Credenciais e Impostos
-
-Consulte o nosso guia passo a passo para começar a emitir as notas fiscais com apenas um clique na sua Loja Virtual:
-
-- [Guia de emissão de Nota Fiscal para Loja Virtual](https://webmaniabr.com/blog/guia-de-emissao-de-nota-fiscal-para-loja-virtual/)
-
 ## Instruções
 
+- [Guia de emissão de Nota Fiscal para Loja Virtual](https://webmaniabr.com/blog/guia-de-emissao-de-nota-fiscal-para-loja-virtual/)
 - [Configuração dos campos do Checkout](https://ajuda.webmaniabr.com/nota-fiscal-eletronica-configuracoes-e-gerenciamento/modulo-prestashop/instalacao-prestashop-configuracao-dos-campos-no-checkout)
 - [Emissão de notas fiscais para pedidos antigos](https://ajuda.webmaniabr.com/nota-fiscal-eletronica-configuracoes-e-gerenciamento/modulo-prestashop/instalacao-prestashop-emissao-de-notas-fiscais-para-pedidos-antigos)
 - [Como o módulo deve ser atualizado?](https://ajuda.webmaniabr.com/nota-fiscal-eletronica-configuracoes-e-gerenciamento/modulo-prestashop/instalacao-prestashop-como-o-modulo-deve-ser-atualizado)
