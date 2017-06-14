@@ -32,30 +32,17 @@ Após realizar o download da última versão ([Clique aqui](https://github.com/w
 <img src="https://webmaniabr.com/atendimento/wp-content/uploads/sites/4/2016/06/img_5771a771d14d1.png">
 </p>
 
-## Configuração
+## Configuração das Credenciais e Impostos
 
 Consulte o nosso guia passo a passo para começar a emitir as notas fiscais com apenas um clique na sua Loja Virtual:
 
 - [Guia de emissão de Nota Fiscal para Loja Virtual](https://webmaniabr.com/blog/guia-de-emissao-de-nota-fiscal-para-loja-virtual/)
 
-## Campos Obrigatórios
+## Instruções
 
-Para emitir uma NFe, é obrigatório informar o Tipo de Pessoa (CPF/CNPJ), número e bairro do Endereço.
-O módulo possui a opção para habilitar estes campos:
-
-<p align="center">
-<img src="https://webmaniabr.com/wp-content/uploads/2017/03/1488915583.png">
-</p>
-
-Caso você já possua outro módulo que insira estes campos, é necessário configurar o nome dos mesmos para que os dados sejam salvos de forma correta:
-
-<p align="center">
-<img src="https://webmaniabr.com/wp-content/uploads/2017/03/1488915600.png">
-</p>
-
-Para descobrir o nome dos campos é preciso inspecionar o elemento na página de Checkout (ou de Endereço) e verificar o atributo "name".
-
-Havendo dúvidas de como manusear os arquivos e eventuais incompatibilidades com o seu tema, por favor, entre em contato no e-mail suporte@webmaniabr.com.
+- [Configuração dos campos do Checkout](https://ajuda.webmaniabr.com/nota-fiscal-eletronica-configuracoes-e-gerenciamento/modulo-prestashop/instalacao-prestashop-configuracao-dos-campos-no-checkout)
+- [Emissão de notas fiscais para pedidos antigos](https://ajuda.webmaniabr.com/nota-fiscal-eletronica-configuracoes-e-gerenciamento/modulo-prestashop/instalacao-prestashop-emissao-de-notas-fiscais-para-pedidos-antigos)
+- [Como o módulo deve ser atualizado?](https://ajuda.webmaniabr.com/nota-fiscal-eletronica-configuracoes-e-gerenciamento/modulo-prestashop/instalacao-prestashop-como-o-modulo-deve-ser-atualizado)
 
 ## Controle das Notas Fiscais
 
@@ -67,4 +54,4 @@ Você pode gerenciar todas as Notas Fiscais e realizar a impressão do Danfe no 
 
 ## Suporte
 
-Qualquer dúvida entre em contato na nossa [Central de Atendimento](https://webmaniabr.com/atendimento/) ou no e-mail suporte@webmaniabr.com.
+Qualquer dúvida entre em contato na nossa [Central de Ajuda](https://ajuda.webmaniabr.com) ou [Abra um chamado](https://webmaniabr.zendesk.com/hc/pt-br/requests).
