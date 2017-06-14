@@ -113,8 +113,9 @@ jQuery(document).ready(function(){
 
       getBulkAction: function(){
 
-        var action = "sendBulkAction($(this).closest('form').get(0), 'submitBulkemitirNfeorder')";
+        var action = "sendBulkAction($(this).closest('form').get(0), 'submitBulkemitirNfeorder');";
         var $html = '<li><a href="#" id="emitirNfe" onclick="'+action+'"><i class="icon-file-text"></i> Emitir NF-e</a><input type="hidden" name="" value="update" /></li>';
+        $html += '<input type="hidden" name="wmbr_bulk_action" value="emitirNfe" />';
 
         return $html;
 

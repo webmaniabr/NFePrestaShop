@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.5';
+    $this->version = '2.5.2';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -1366,12 +1366,12 @@ class WebmaniaBrNFe extends Module{
 
     if($type == $cpf_ref){
       if(Tools::getValue($fields['cpf'])){
-        $update_values['nfe_document_number'] = pSQL(Tools::getValue($fields['cpf']));
+        $update_values['nfe_document_number'] = preg_replace("/[^0-9]/","", Tools::getValue($fields['cpf']));
       }
 
     }else if($type == $cnpj_ref){
       if(Tools::getValue($fields['cnpj'])){
-        $update_values['nfe_document_number'] = pSQL(Tools::getValue($fields['cnpj']));
+        $update_values['nfe_document_number'] = preg_replace("/[^0-9]/","", Tools::getValue($fields['cnpj']));
       }
 
       if(Tools::getValue($fields['razao_social'])){
@@ -1534,9 +1534,9 @@ class WebmaniaBrNFe extends Module{
          'pagamento' => 0, // Indicador da forma de pagamento
          'presenca' => 2, // Indicador de presença do comprador no estabelecimento comercial no momento da operação
          'modalidade_frete' => 0, // Modalidade do frete
-         'frete' => number_format($order->total_shipping, 2), // Total do frete
-         'desconto' => number_format($order->total_discounts_tax_incl, 2), // Total do desconto
-         'total' => number_format($order->total_paid_tax_incl, 2),  // Total do pedido - sem descontos
+         'frete' => number_format($order->total_shipping, 2, '.', ''), // Total do frete
+         'desconto' => number_format($order->total_discounts_tax_incl, 2, '.', ''), // Total do desconto
+         'total' => number_format($order->total_paid_tax_incl, 2, '.', ''),  // Total do pedido - sem descontos
      );
 
      //Informações COmplementares ao Fisco
@@ -1600,15 +1600,15 @@ class WebmaniaBrNFe extends Module{
        $ignorar = Db::getInstance()->getValue('SELECT nfe_ignorar_nfe FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
 
        if($ignorar == '1'){
-         $data['pedido']['total'] -= number_format($item['total_price_tax_incl'], 2);
+         $data['pedido']['total'] -= number_format($item['total_price_tax_incl'], 2, '.', '');
 
          foreach($discounts_applied as $percentage){
            $data['pedido']['total'] += ($percentage/100)*$item['total_price_tax_incl'];
            $data['pedido']['desconto'] -= ($percentage/100)*$item['total_price_tax_incl'];
          }
 
-         $data['pedido']['total'] = number_format($data['pedido']['total'], 2);
-         $data['pedido']['desconto'] = number_format($data['pedido']['desconto'], 2);
+         $data['pedido']['total'] = number_format($data['pedido']['total'], 2, '.', '');
+         $data['pedido']['desconto'] = number_format($data['pedido']['desconto'], 2, '.', '');
 
          continue;
        }
@@ -1647,8 +1647,8 @@ class WebmaniaBrNFe extends Module{
        if (!$imposto) $imposto = Configuration::get($this->name.'tax_class');
 
 
-        $subtotal = number_format($item['unit_price_tax_incl'], 2);
-        $total_price = number_format($item['total_price_tax_incl'], 2);
+        $subtotal = number_format($item['unit_price_tax_incl'], 2, '.', '');
+        $total_price = number_format($item['total_price_tax_incl'], 2, '.', '');
 
        $data['produtos'][] = array(
          'nome' => $item['product_name'], // Nome do produto
@@ -1660,8 +1660,8 @@ class WebmaniaBrNFe extends Module{
          'unidade' => 'UN', // Unidade de medida da quantidade de itens
          'peso' => $peso, // Peso em KG. Ex: 800 gramas = 0.800 KG
          'origem' => ($origem == '00' ? 0 : $origem),//Origem do produto
-         'subtotal' => number_format($item['unit_price_tax_incl'], 2), // Preço unitário do produto - sem descontos
-         'total' => number_format($item['total_price_tax_incl'], 2), // Preço total (quantidade x preço unitário) - sem descontos
+         'subtotal' => number_format($item['unit_price_tax_incl'], 2, '.', ''), // Preço unitário do produto - sem descontos
+         'total' => number_format($item['total_price_tax_incl'], 2, '.', ''), // Preço total (quantidade x preço unitário) - sem descontos
          'classe_imposto' => $imposto // Referência do imposto cadastrado
        );
      }
@@ -1826,7 +1826,7 @@ class WebmaniaBrNFe extends Module{
 
   public function processBulkEmitirNfe(){
 
-    if(Tools::isSubmit('bulkEmitirNfe')){
+    if(Tools::isSubmit('bulkEmitirNfe') || Tools::isSubmit('wmbr_bulk_action')){
       $values = Tools::getValue('orderBox');
       foreach($values as $orderID){
         $this->emitirNfe($orderID);
