@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.5.2';
+    $this->version = '2.6.0';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -143,6 +143,29 @@ class WebmaniaBrNFe extends Module{
 
 
     return $output.$this->displayForm();
+  }
+
+  public function get_shipping_methods_options() {
+
+    $options = array();
+
+    $options[] = array(
+      'id_option' => '',
+      'name' => 'Selecionar'
+    );
+
+    $default_language = (int)Configuration::get('PS_LANG_DEFAULT');
+    $methods = Carrier::getCarriers($default_language);
+
+    foreach($methods as $carrier){
+      $options[] = array(
+        'id_option' => $carrier['id_carrier'],
+        'name' => $carrier['name'],
+      );
+    }
+
+    return $options;
+
   }
 
   public function displayForm(){
@@ -534,6 +557,87 @@ class WebmaniaBrNFe extends Module{
 
     $fields_form[5]['form'] = array(
       'legend' => array(
+        'title' => $this->l('Informações da Transportadora'),
+      ),
+      'input' => array(
+        array(
+          'type' => 'radio',
+          'hint' => 'Incluir dados da transportadora em pedidos enviados com o método configurado',
+          'label' => $this->l('Incluir dados da transportadora na NF-e'),
+          'name' => $this->name.'transp_include',
+          'required' => true,
+          'values' => array(
+            array(
+              'id' => 'include_on',
+              'value' => 'on',
+              'label' => $this->l('Ativado'),
+            ),
+            array(
+              'id' => 'include_off',
+              'value' => 'off',
+              'label' => $this->l('Desativado'),
+            ),
+          )
+        ),
+        array(
+          'type' => 'select',
+          'label' => $this->l('Método de Entrega'),
+          'name' => $this->name.'transp_method',
+          'options' => array(
+            'query' => $this->get_shipping_methods_options(),
+            'id' => 'id_option',
+            'name' => 'name'
+          )
+
+        ),
+        array(
+          'type' => 'text',
+          'label' => $this->l('Razão Social'),
+          'name' => $this->name.'transp_rs',
+          'size' => 50,
+        ),
+        array(
+          'type' => 'text',
+          'label' => $this->l('CNPJ'),
+          'name' => $this->name.'transp_cnpj',
+          'size' => 50,
+        ),
+        array(
+          'type' => 'text',
+          'label' => $this->l('Inscrição Estadual'),
+          'name' => $this->name.'transp_ie',
+          'size' => 50,
+        ),
+        array(
+          'type' => 'text',
+          'label' => $this->l('Endereço'),
+          'name' => $this->name.'transp_address',
+          'size' => 50,
+        ),
+        array(
+          'type' => 'text',
+          'label' => $this->l('CEP'),
+          'name' => $this->name.'transp_cep',
+          'size' => 50,
+        ),
+        array(
+          'type' => 'text',
+          'label' => $this->l('Cidade'),
+          'name' => $this->name.'transp_city',
+          'size' => 50,
+        ),
+        array(
+          'type' => 'text',
+          'label' => $this->l('UF'),
+          'name' => $this->name.'transp_uf',
+          'size' => 50,
+        ),
+      ),
+
+    );
+
+    $fields_form[6]['form'] = array(
+      'legend' => array(
         'title' => $this->l('Salvar alteraçoes')
       ),
       'submit' => array(
@@ -611,6 +715,15 @@ class WebmaniaBrNFe extends Module{
       $this->name.'valor_pessoa_juridica' => Configuration::get($this->name.'valor_pessoa_juridica'),
       $this->name.'uniq_key' => Configuration::get($this->name.'uniq_key'),
       $this->name.'envio_email' => Configuration::get($this->name.'envio_email'),
+      $this->name.'transp_include'      => Configuration::get($this->name.'transp_include'),
+      $this->name.'transp_method'      => Configuration::get($this->name.'transp_method'),
+      $this->name.'transp_rs'      => Configuration::get($this->name.'transp_rs'),
+      $this->name.'transp_cnpj'    => Configuration::get($this->name.'transp_cnpj'),
+      $this->name.'transp_ie'      => Configuration::get($this->name.'transp_ie'),
+      $this->name.'transp_address' => Configuration::get($this->name.'transp_address'),
+      $this->name.'transp_cep'     => Configuration::get($this->name.'transp_cep'),
+      $this->name.'transp_city'    => Configuration::get($this->name.'transp_city'),
+      $this->name.'transp_uf'      => Configuration::get($this->name.'transp_uf'),
     );
 
   }
@@ -650,7 +763,16 @@ class WebmaniaBrNFe extends Module{
       $this->name.'valor_pessoa_juridica' => '',
       $this->name.'bairro_status' => 'off',
       $this->name.'bairro_status' => md5(uniqid(rand(), true)),
-      $this->name.'envio_email' => 'off',
+      $this->name.'envio_email' => 'on',
+      $this->name.'transp_include'      => 'off',
+      $this->name.'transp_method'      => '',
+      $this->name.'transp_rs'      => '',
+      $this->name.'transp_cnpj'    => '',
+      $this->name.'transp_ie'      => '',
+      $this->name.'transp_address' => '',
+      $this->name.'transp_cep'     => '',
+      $this->name.'transp_city'    => '',
+      $this->name.'transp_uf'      => '',
     );
 
   }
@@ -722,9 +844,6 @@ class WebmaniaBrNFe extends Module{
       }
     }
 
-
-
-
     return true;
   }
 
@@ -739,18 +858,47 @@ class WebmaniaBrNFe extends Module{
   public function hookDisplayInvoice($params) {
 
     $order_id = $params['id_order'];
+    $order = new Order($order_id);
+
+    $this->display_order_nfe_table($order_id);
+
+    if(Tools::getValue('nfe-transporte-info')){
+      $this->save_order_transporte_info($order_id);
+    }
+
+    $include_shipping_info = Configuration::get($this->name.'transp_include');
+
+    if($include_shipping_info == 'on'){
+
+      $method = Configuration::get($this->name.'transp_method');
+
+      if($method == $order->id_carrier){
+        $this->display_order_transporte_info($order_id);
+      }
+
+    }
+
+  }
+
+
+  public function display_order_nfe_table($order_id){
+
+    $order_id = (int) $order_id;
 
     $nfe_info = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $order_id" ));
 
     $url  = 'index.php?controller=AdminOrders&id_order='.$order_id;
     $url .= '&vieworder&token='.Tools::getAdminTokenLite('AdminOrders');
+
     if(!$nfe_info){
+
       echo '<div class="panel kpi-container" id="nfe_emitidas">
       <div class="row">
       <h3 style="padding-left:15px;">Notas emitidas para este pedido</h3>
       <p>Nenhuma nota emitida</p>
       </div>
       </div>';
+
     }else{
 
       if(_MAIN_PS_VERSION_ == '1.5'){
@@ -771,6 +919,7 @@ class WebmaniaBrNFe extends Module{
         'nfe_info_arr' => $nfe_info,
         'url' => $url,
       ));
+
       echo  $this->display(__FILE__, 'nfe_info_table.tpl');
 
       $order = new Order($order_id);
@@ -788,6 +937,44 @@ class WebmaniaBrNFe extends Module{
       echo $this->display(__FILE__, 'user_address_info.tpl');
 
     }
+
+  }
+
+  public function display_order_transporte_info($order_id){
+
+    $transporte_info = $this->get_order_transporte_info($order_id);
+
+    $this->context->smarty->assign(array(
+      'transporte_info' => $transporte_info,
+    ));
+
+    echo $this->display(__FILE__, 'nfe_transporte_info.tpl');
+
+  }
+
+  public function save_order_transporte_info($order_id){
+
+    $order_id = (int) $order_id;
+
+    if(!Db::getInstance()->update('orders', array(
+      'nfe_modalidade_frete'=> pSQL(Tools::getValue('nfe_modalidade_frete')),
+      'nfe_volumes' => pSQL(Tools::getValue('nfe_volumes')),
+      'nfe_especie' => pSQL(Tools::getValue('nfe_especie')),
+      'nfe_peso_bruto' => pSQL(Tools::getValue('nfe_peso_bruto')),
+      'nfe_peso_liquido' => pSQL(Tools::getValue('nfe_peso_liquido')),
+    ),'id_order = ' .$order_id )){
+      $this->context->controller->_errors[] = Tools::displayError('Error: ').mysql_error();
+    }
+
+  }
+
+  public function get_order_transporte_info( $order_id ) {
+
+    $order_id = (int) $order_id;
+
+    $transporte_info = Db::getInstance()->getRow("SELECT nfe_modalidade_frete, nfe_volumes, nfe_especie, nfe_peso_bruto, nfe_peso_liquido FROM "._DB_PREFIX_."orders WHERE id_order = $order_id");
+
+    return $transporte_info;
 
   }
 
@@ -1666,6 +1853,47 @@ class WebmaniaBrNFe extends Module{
        );
      }
 
+    $include_shipping_info = Configuration::get($this->name.'transp_include');
+
+     if($include_shipping_info == 'on'){
+
+       $method = Configuration::get($this->name.'transp_method');
+
+       if($method == $order->id_carrier){
+
+         $data['transporte'] = array(
+           'cnpj'         => Configuration::get($this->name.'transp_cnpj'),
+           'razao_social' => Configuration::get($this->name.'transp_rs'),
+           'ie'           => Configuration::get($this->name.'transp_ie'),
+           'endereco'     => Configuration::get($this->name.'transp_address'),
+           'uf'           => Configuration::get($this->name.'transp_uf'),
+           'cidade'       => Configuration::get($this->name.'transp_city'),
+           'cep'          => Configuration::get($this->name.'transp_cep'),
+         );
+
+         $transporte_info = Db::getInstance()->getRow("SELECT nfe_modalidade_frete, nfe_volumes, nfe_especie, nfe_peso_bruto, nfe_peso_liquido FROM "._DB_PREFIX_."orders WHERE id_order = $orderID");
+
+         $transporte_keys = array(
+           'nfe_volumes'      => 'volume',
+           'nfe_especie'      => 'especie',
+           'nfe_peso_bruto'   => 'peso_bruto',
+           'nfe_peso_liquido' => 'peso_liquido'
+         );
+
+         foreach($transporte_keys as $db_key => $api_key){
+           if($transporte_info[$db_key]){
+             $data['transporte'][$api_key] = $transporte_info[$db_key];
+           }
+         }
+
+         if($transporte_info['nfe_modalidade_frete']){
+           $data['pedido']['modalidade_frete'] = $transporte_info['nfe_modalidade_frete'];
+         }
+
+       }
+
+    }
+
     return $data;
   }
 
@@ -1885,7 +2113,31 @@ class WebmaniaBrNFe extends Module{
         'nfe_info' => array(
           'name' => 'nfe_info',
           'sql' => ' ADD COLUMN nfe_info TEXT'
-        )
+        ),
+        'nfe_modalidade_frete' => array(
+          'name' => 'nfe_modalidade_frete',
+          'sql' => ' ADD COLUMN nfe_modalidade_frete VARCHAR(5) DEFAULT 0'
+        ),
+
+        'nfe_volumes'  => array(
+          'name' => 'nfe_volumes',
+          'sql' => ' ADD COLUMN nfe_volumes VARCHAR(10)'
+        ),
+
+        'nfe_especie'  => array(
+          'name' => 'nfe_especie',
+          'sql' => ' ADD COLUMN nfe_especie VARCHAR(10)'
+        ),
+
+        'nfe_peso_bruto'  => array(
+          'name' => 'nfe_peso_bruto',
+          'sql' => ' ADD COLUMN nfe_peso_bruto VARCHAR(10)'
+        ),
+
+        'nfe_peso_liquido'  => array(
+          'name' => 'nfe_peso_liquido',
+          'sql' => ' ADD COLUMN nfe_peso_liquido VARCHAR(10)'
+        ),
       ));
 
     $productsColumnsToAdd = array(
@@ -1914,7 +2166,8 @@ class WebmaniaBrNFe extends Module{
           'nfe_ignorar_nfe' => array(
             'name' => 'nfe_ignorar_nfe',
             'sql' => ' ADD COLUMN nfe_ignorar_nfe VARCHAR(5) DEFAULT 0'
-          )
+          ),
+
         ));
 
         $addressColumnsToAdd = array(
@@ -2415,7 +2668,7 @@ class WebmaniaBrNFe extends Module{
 
   function listen_notification() {
 
-    if($_SERVER['REQUEST_METHOD'] === 'POST' && $_GET['retorno_nfe'] && $_GET['order_id']){
+    if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['retorno_nfe']) && $_GET['order_id']){
 
       $order_id = (int) $_GET['order_id'];
       $uniq_key = Configuration::get($this->name.'uniq_key');
