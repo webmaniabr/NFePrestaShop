@@ -49,11 +49,11 @@
     </div>
     {/if}
   </div>
-  <div id="cpf-field" class="form-group {if $document_type != 'cnpj'} active{/if}" {if $document_type == 'cnpj'} style="display:none;" {/if}>
+  <div id="cpf-field" class="form-group {if $document_type != 'cnpj'} active{/if}" {if $document_type == 'cnpj'} style="display:none;overflow:hidden" {/if}>
     <label>CPF <sup>*</sup></label>
     <input type="text" class="form-control" name="cpf" id="cpf-input" value="{if $document_type == 'cpf'}{$document_number}{/if}"/>
   </div>
-  <div id="cnpj-field" {if $document_type != 'cnpj'} style="display:none" {/if}  {if $document_type == 'cnpj'} class="active" style="display:block;" {/if}>
+  <div id="cnpj-field" {if $document_type != 'cnpj'} style="display:none" {/if}  {if $document_type == 'cnpj'} class="active" style="display:block;overflow:hidden" {/if}>
     <div class="form-group">
       <label>Razão Social <sup>*</sup></label>
       <input type="text" class="form-control" name="razao_social" value="{if $document_type == 'cnpj'} {$razao_social}{/if}"/>

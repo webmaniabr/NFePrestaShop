@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.6.0';
+    $this->version = '2.6.1';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
