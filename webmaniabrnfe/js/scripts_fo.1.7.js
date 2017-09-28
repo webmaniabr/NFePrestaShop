@@ -420,7 +420,7 @@ var cache = {};
       this.value = this.value.replace(/[^0-9\.]/g,'');
     });
 
-    $('input[name="ieValue"]').keyup(function ()
+    $('input[name="ieValue"]').keyup(function (){
       this.value = this.value.replace(/[^0-9\.]/g,'');
     });
   }

@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.6.1';
+    $this->version = '2.6.5';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -1073,8 +1073,13 @@ class WebmaniaBrNFe extends Module{
 
   public function hookDisplayAdminProductsExtra($params){
 
-    if(Validate::isLoadedObject($product = new Product((int)Tools::getValue('id_product')))){
-      $values = $this->getProductNfeValues((int)Tools::getValue('id_product'));
+    $product_id = (int)Tools::getValue('id_product');
+    if(!$product_id) $product_id = $params['id_product'];
+
+    if(Validate::isLoadedObject($product = new Product($product_id))){
+
+      $values = $this->getProductNfeValues( $product_id );
+
       $this->context->smarty->assign(array(
         'tax_class' => $values[0]['nfe_tax_class'],
         'ean_bar_code' => $values[0]['nfe_ean_bar_code'],
@@ -1083,10 +1088,13 @@ class WebmaniaBrNFe extends Module{
         'product_source' => $values[0]['nfe_product_source'],
         'ignorar_nfe' => $values[0]['nfe_ignorar_nfe']
       ));
+
     }
 
     if(_MAIN_PS_VERSION_ == '1.5'){
       return $this->display(__FILE__, 'nfe_product_tab.1.5.tpl');
+    }else if(_MAIN_PS_VERSION_ == '1.7'){
+      return $this->display(__FILE__, 'nfe_product_tab.1.7.tpl');
     }else{
       return $this->display(__FILE__, 'nfe_product_tab.1.6.tpl');
     }
@@ -1535,6 +1543,24 @@ class WebmaniaBrNFe extends Module{
     if($cpf_cnpj_status == 'off' && $context_type != 'admin'){
       $cpf_ref = Configuration::get($this->name.'valor_pessoa_fisica');
       $cnpj_ref = Configuration::get($this->name.'valor_pessoa_juridica');
+    }
+
+    if( !$type ){
+
+      if($fields['cpf'] == $fields['cnpj']){
+
+        $document_value = preg_replace("/[^0-9]/","", Tools::getValue($fields['cpf']));
+
+        if( strlen($document_value) == 11 ){
+          $type = $cpf_ref;
+        }else{
+          $type = $cnpj_ref;
+        }
+
+      }else{
+        $type = $cpf_ref;
+      }
+
     }
 
     if($type){
@@ -2054,7 +2080,7 @@ class WebmaniaBrNFe extends Module{
 
   public function processBulkEmitirNfe(){
 
-    if(Tools::isSubmit('bulkEmitirNfe') || Tools::isSubmit('wmbr_bulk_action')){
+    if(Tools::isSubmit('bulkEmitirNfe')){
       $values = Tools::getValue('orderBox');
       foreach($values as $orderID){
         $this->emitirNfe($orderID);

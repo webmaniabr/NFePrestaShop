@@ -49,7 +49,7 @@
     </div>
     {/if}
   </div>
-  <div id="cpf-field" class="form-group {if $document_type != 'cnpj'} active{/if}" {if $document_type == 'cnpj'} style="display:none;overflow:hidden" {/if}>
+  <div id="cpf-field" class="form-group {if $document_type != 'cnpj'} active{/if}" style="{if $document_type == 'cnpj'}display:none;{/if}overflow:hidden" >
     <label>CPF <sup>*</sup></label>
     <input type="text" class="form-control" name="cpf" id="cpf-input" value="{if $document_type == 'cpf'}{$document_number}{/if}"/>
   </div>

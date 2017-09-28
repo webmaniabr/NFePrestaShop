@@ -14,11 +14,11 @@
       </label>
     </div>
   </div>
-  <div id="cpf-field" class="form-group active">
+  <div id="cpf-field" class="form-group active" style="overflow:hidden">
     <label>CPF <sup>*</sup></label>
     <input type="text" class="form-control" name="cpf" id="cpf-input"/>
   </div>
-  <div id="cnpj-field" style="display:none">
+  <div id="cnpj-field" style="display:none;overflow:hidden;">
     <div class="form-group">
       <label>Razão Social <sup>*</sup></label>
       <input type="text" class="form-control" name="razao_social" />
