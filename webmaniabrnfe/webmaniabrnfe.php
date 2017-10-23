@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.6.5';
+    $this->version = '2.6.7';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -75,6 +75,7 @@ class WebmaniaBrNFe extends Module{
       'actionObjectAddressAddAfter',
       'actionObjectCustomerAddAfter',
       'actionObjectCustomerUpdateAfter',
+      'displayBackOfficeCategory'
     );
 
 
@@ -847,6 +848,13 @@ class WebmaniaBrNFe extends Module{
     return true;
   }
 
+
+  public function hookDisplayBackOfficeCategory(){
+
+    $this->context->controller->addJS($this->_path.'/js/script_categories.1.7.js', 'all');
+
+  }
+
   public function hookDisplayBackOfficeHeader($params){
 
     $this->hookBackOfficeHeader($params);
@@ -1439,16 +1447,33 @@ class WebmaniaBrNFe extends Module{
   public function hookActionCategoryUpdate( $params ) {
 
     $category_id = Tools::getValue('id_category');
-    $ncm = Tools::getValue('nfe_category_ncm');
+    $values = Tools::getAllValues();
+    $ncm = '';
 
+    foreach($values as $key => $value){
+
+      if( strpos($key, 'nfe_category_ncm') !== false ){
+        $ncm = pSQL($value);
+        break;
+      }
+
+    }
 
     $update_values = array(
-      'nfe_category_ncm'=> pSQL($ncm),
+      'nfe_category_ncm' => $ncm
     );
 
-    if(!Db::getInstance()->autoExecute(_DB_PREFIX_.'category', $update_values, 'UPDATE', 'id_category = ' .(int)$category_id)){
-      $this->errors[] = Db::getInstance()->getMsgError();
+    if( $category_id && $ncm){
+
+      $query = "UPDATE ". _DB_PREFIX_ ."category SET nfe_category_ncm = '".$ncm."' WHERE id_category = " . $category_id;
+      $result = Db::getInstance()->update( 'category', $update_values, 'id_category = ' .(int)$category_id );
+
+      if(!$result){
+        $this->errors[] = Db::getInstance()->getMsgError();
+      }
+
     }
+
 
   }
 
@@ -1716,7 +1741,7 @@ class WebmaniaBrNFe extends Module{
     }
 
 
-      $customer = $order->getCustomer();
+    $customer = $order->getCustomer();
 
 
 
@@ -1767,23 +1792,13 @@ class WebmaniaBrNFe extends Module{
      }
 
      //Client
-     if ($tipo_pessoa == 'cpf'){
-         $data['cliente'] = array(
-             'cpf' => $this->cpf($customer_custom['nfe_document_number']), // (pessoa fisica) Número do CPF
-             'nome_completo' => $customer->firstname.' '.$customer->lastname, // (pessoa fisica) Nome completo
-             'endereco' => $address->address1, // Endereço de entrega dos produtos
-             'complemento' => $address->other, // Complemento do endereço de entrega
-             'numero' => $address_custom['address_number'], // Número do endereço de entrega
-             'bairro' => $address->address2, // Bairro do endereço de entrega
-             'cidade' => $address->city, // Cidade do endereço de entrega
-             'uf' => $state->iso_code, // Estado do endereço de entrega
-             'cep' => $address->postcode, // CEP do endereço de entrega
-             'telefone' => $address->phone, // Telefone do cliente
-             'email' => ($envio_email == 'on' ? $customer->email : '') // E-mail do cliente para envio da NF-e
-         );
-     }else if($tipo_pessoa == 'cnpj'){
+     if($tipo_pessoa == 'cnpj'){
+
+       $cnpj = $this->cnpj($customer_custom['nfe_document_number']);
+       if( !$cnpj && isset($customer->cnpj) ) $cnpj = $customer->cnpj;
+
        $data['cliente'] = array(
-         'cnpj' => $this->cnpj($customer_custom['nfe_document_number']), // (pessoa jurídica) Número do CNPJ
+         'cnpj' => $cnpj, // (pessoa jurídica) Número do CNPJ
          'razao_social' => $customer_custom['nfe_razao_social'], // (pessoa jurídica) Razão Social
          'ie' => $customer_custom['nfe_pj_ie'], // (pessoa jurídica) Número da Inscrição Estadual
          'endereco' => $address->address1, // Endereço de entrega dos produtos
@@ -1794,7 +1809,25 @@ class WebmaniaBrNFe extends Module{
          'uf' => $state->iso_code, // Estado do endereço de entrega
          'cep' => $address->postcode, // CEP do endereço de entrega
          'telefone' => $address->phone, // Telefone do cliente
-         'email' => ($envio_email == 'on' ? $customer->email : '') // E-mail do cliente para envio da NF-e
+         'email' => $customer->email // E-mail do cliente para envio da NF-e
+       );
+     }else{
+
+       $cpf = $this->cpf($customer_custom['nfe_document_number']);
+       if( !$cpf && isset($customer->cpf) ) $cpf = $customer->cpf;
+
+       $data['cliente'] = array(
+         'cpf' => $cpf, // (pessoa fisica) Número do CPF
+         'nome_completo' => $customer->firstname.' '.$customer->lastname, // (pessoa fisica) Nome completo
+         'endereco' => $address->address1, // Endereço de entrega dos produtos
+         'complemento' => $address->other, // Complemento do endereço de entrega
+         'numero' => $address_custom['address_number'], // Número do endereço de entrega
+         'bairro' => $address->address2, // Bairro do endereço de entrega
+         'cidade' => $address->city, // Cidade do endereço de entrega
+         'uf' => $state->iso_code, // Estado do endereço de entrega
+         'cep' => $address->postcode, // CEP do endereço de entrega
+         'telefone' => $address->phone, // Telefone do cliente
+         'email' => $customer->email // E-mail do cliente para envio da NF-e
        );
      }
 
@@ -2080,7 +2113,7 @@ class WebmaniaBrNFe extends Module{
 
   public function processBulkEmitirNfe(){
 
-    if(Tools::isSubmit('bulkEmitirNfe')){
+    if( Tools::isSubmit('bulkEmitirNfe') && Tools::isSubmit('wmbr_bulk_action') ){
       $values = Tools::getValue('orderBox');
       foreach($values as $orderID){
         $this->emitirNfe($orderID);
@@ -2231,15 +2264,28 @@ class WebmaniaBrNFe extends Module{
               )
             ));
 
-            $categoryColumnsToAdd = array(
-              'table_name' => 'category_lang',
-              'columns' => array(
-                'nfe_category_ncm' => array(
-                  'name' => 'nfe_category_ncm',
-                  'sql'  => ' ADD COLUMN nfe_category_ncm VARCHAR(20)'
+            if(_MAIN_PS_VERSION_ == '1.7'){
+              $categoryColumnsToAdd = array(
+                'table_name' => 'category',
+                'columns' => array(
+                  'nfe_category_ncm' => array(
+                    'name' => 'nfe_category_ncm',
+                    'sql'  => ' ADD COLUMN nfe_category_ncm VARCHAR(20)'
+                  )
                 )
-              )
-            );
+              );
+            }else{
+              $categoryColumnsToAdd = array(
+                'table_name' => 'category_lang',
+                'columns' => array(
+                  'nfe_category_ncm' => array(
+                    'name' => 'nfe_category_ncm',
+                    'sql'  => ' ADD COLUMN nfe_category_ncm VARCHAR(20)'
+                  )
+                )
+              );
+            }
+
 
       return array($ordersColumnsToAdd, $productsColumnsToAdd, $addressColumnsToAdd, $customerColumnsToAdd, $categoryColumnsToAdd);
 
