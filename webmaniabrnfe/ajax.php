@@ -12,7 +12,7 @@ switch (Tools::getValue('method')) {
   case 'getAddressInfo' :
 
     $address = new Address(Tools::getValue('addressID'));
-    $result = Db::getInstance()->getRow('SELECT address_number FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
+    $result = Db::getInstance()->getRow('SELECT address_number, bairro FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
 
 
     echo json_encode($result);
@@ -40,12 +40,28 @@ switch (Tools::getValue('method')) {
       case 'updateAddressInfo':
         updateAddressInfo(Tools::getValue('addressID'));
         break;
+      case 'getCategoryNcm':
+        getCategoryNcm( Tools::getValue('id_category') );
+        break;
   default:
     exit;
 }
 
 
+function getCategoryNcm($id_category){
 
+  $sql = 'SELECT nfe_category_ncm FROM '._DB_PREFIX_.'category WHERE id_category = '.(int)$id_category.'';
+  $ncm = Db::getInstance()->getValue($sql);
+
+  if($ncm){
+    echo json_encode(array('ncm' => $ncm, 'result' => 'success'));
+  }else{
+    echo json_encode(array('result' => 'error'));
+  }
+
+
+  die();
+}
 
 function checkForDocument($address_id, $customer_id){
   $result_customer = Db::getInstance()->executeS('SELECT nfe_document_number, nfe_document_type FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer_id);

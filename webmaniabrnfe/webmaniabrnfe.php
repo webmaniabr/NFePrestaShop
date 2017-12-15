@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.6.7';
+    $this->version = '2.6.8';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -1463,7 +1463,8 @@ class WebmaniaBrNFe extends Module{
       'nfe_category_ncm' => $ncm
     );
 
-    if( $category_id && $ncm){
+
+    if( $category_id ){
 
       $query = "UPDATE ". _DB_PREFIX_ ."category SET nfe_category_ncm = '".$ncm."' WHERE id_category = " . $category_id;
       $result = Db::getInstance()->update( 'category', $update_values, 'id_category = ' .(int)$category_id );
@@ -2023,7 +2024,7 @@ class WebmaniaBrNFe extends Module{
 
     $webmaniabr = new NFe($this->settings);
     $data = $this->getOrderData($orderID);
-
+  
     $response = $webmaniabr->emissaoNotaFiscal( $data );
 
     if (isset($response->error) || $response->status == 'reprovado'){

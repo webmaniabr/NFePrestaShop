@@ -25,6 +25,7 @@ jQuery(document).ready(function(){
         adminToken: sec_token,
       }
     }).done(function(response){
+      
       var result = $.parseJSON(response);
 
       if(result.result == 'success'){
