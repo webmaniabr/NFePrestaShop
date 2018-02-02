@@ -173,6 +173,8 @@ jQuery(document).ready(function(){
             if(typeof result.document_type != 'undefined'){
               $('input[value="'+result.document_type+'"]').prop('checked', true).trigger('change');
               $('input[name="'+result.document_type+'"]').val(result.document_number);
+              $('input[name="razao_social"]').val(result.razao_social);
+              $('input[name="nfe_pj_ie"]').val(result.nfe_pj_ie);
             }
           }
         });
@@ -281,7 +283,7 @@ jQuery(document).ready(function(){
 
       if(this.pages.isCustomerPage()){
 
-        this.DOM.insertTipoPessoa();
+        if (tipo_pessoa_enabled == 'on') this.DOM.insertTipoPessoa();
 
         if(this.pages.isEditCustomerPage()){
           this.ajax.getDocuments();
@@ -291,7 +293,7 @@ jQuery(document).ready(function(){
 
       if(this.pages.isAddressPage()){
 
-        this.DOM.insertNumero();
+        if (numero_enabled == 'on') this.DOM.insertNumero();
 
         if(this.pages.isEditAddressPage()){
           this.ajax.getAddressNumber();

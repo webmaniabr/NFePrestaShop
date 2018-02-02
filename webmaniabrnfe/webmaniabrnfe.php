@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.6.8';
+    $this->version = '2.6.9';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -409,24 +409,6 @@ class WebmaniaBrNFe extends Module{
         ),
         array(
           'type' => 'text',
-          'label' => $this->l('Nome do campo Tipo de Pessoa'),
-          'name' => $this->name.'tipo_cliente_field',
-          'size' => 50,
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('Valor (Pessoa Física)'),
-          'name' => $this->name.'valor_pessoa_fisica',
-          'size' => 50,
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('Valor (Pessoa Jurídica)'),
-          'name' => $this->name.'valor_pessoa_juridica',
-          'size' => 50,
-        ),
-        array(
-          'type' => 'text',
           'label' => $this->l('Nome do campo CPF'),
           'name' => $this->name.'cpf_field',
           'size' => 50,
@@ -445,7 +427,6 @@ class WebmaniaBrNFe extends Module{
           'name' => $this->name.'razao_social_field',
           'size' => 50,
         ),
-
         array(
           'type' => 'text',
           'label' => $this->l('Nome do campo Inscrição Estadual'),
@@ -712,8 +693,6 @@ class WebmaniaBrNFe extends Module{
       $this->name.'complemento_field' => Configuration::get($this->name.'complemento_field'),
       $this->name.'cpf_cnpj_status' => Configuration::get($this->name.'cpf_cnpj_status'),
       $this->name.'numero_compl_status' => Configuration::get($this->name.'numero_compl_status'),
-      $this->name.'valor_pessoa_fisica' => Configuration::get($this->name.'valor_pessoa_fisica'),
-      $this->name.'valor_pessoa_juridica' => Configuration::get($this->name.'valor_pessoa_juridica'),
       $this->name.'uniq_key' => Configuration::get($this->name.'uniq_key'),
       $this->name.'envio_email' => Configuration::get($this->name.'envio_email'),
       $this->name.'transp_include'      => Configuration::get($this->name.'transp_include'),
@@ -1484,18 +1463,15 @@ class WebmaniaBrNFe extends Module{
     $update_values = array();
     $context_type = Context::getContext()->controller->controller_type;
 
-    if($number_status == 'on' || $context_type == 'admin'){
+    if($number_status == 'on'){
       $number = Tools::getValue('address_number');
     }else{
       $number = Tools::getValue(Configuration::get($this->name.'numero_field'));
     }
-
-    if($number){
-      $update_values = array(
-        'address_number'=> pSQL($number),
-      );
-    }
-
+  
+    $update_values = array(
+      'address_number'=> pSQL($number),
+    );
 
     if(_MAIN_PS_VERSION_ == '1.7'){
 
@@ -1543,83 +1519,52 @@ class WebmaniaBrNFe extends Module{
     $update_values = array();
     $context_type = Context::getContext()->controller->controller_type;
 
-
-    if($cpf_cnpj_status == 'on' || $context_type == 'admin'){
+    if ($cpf_cnpj_status == 'on'){
       $fields = array(
-        'tipo_pessoa'  => 'document_type',
         'cpf'          => 'cpf',
         'cnpj'         => 'cnpj',
         'razao_social' => 'razao_social',
         'ie'           => 'cnpj_ie'
       );
-    }else{
+    } else {
       $fields = array(
-        'tipo_pessoa'  => Configuration::get($this->name.'tipo_cliente_field'),
         'cpf'          => Configuration::get($this->name.'cpf_field'),
         'cnpj'         => Configuration::get($this->name.'cnpj_field'),
         'razao_social' => Configuration::get($this->name.'razao_social_field'),
         'ie'           => Configuration::get($this->name.'cnpj_ie_field'),
       );
     }
-
-    $type = Tools::getValue($fields['tipo_pessoa']);
-    $cpf_ref = 'cpf';
-    $cnpj_ref = 'cnpj';
-
-    if($cpf_cnpj_status == 'off' && $context_type != 'admin'){
-      $cpf_ref = Configuration::get($this->name.'valor_pessoa_fisica');
-      $cnpj_ref = Configuration::get($this->name.'valor_pessoa_juridica');
-    }
-
-    if( !$type ){
-
-      if($fields['cpf'] == $fields['cnpj']){
-
-        $document_value = preg_replace("/[^0-9]/","", Tools::getValue($fields['cpf']));
-
-        if( strlen($document_value) == 11 ){
-          $type = $cpf_ref;
-        }else{
-          $type = $cnpj_ref;
-        }
-
-      }else{
-        $type = $cpf_ref;
-      }
-
-    }
-
-    if($type){
-
-      if($type == $cpf_ref){
-        $update_values = array(
-          'nfe_document_type' => 'cpf',
-        );
-      }else if($type == $cnpj_ref){
-        $update_values = array(
-          'nfe_document_type' => 'cnpj',
-        );
-      }
-
-    }
-
-    if($type == $cpf_ref){
-      if(Tools::getValue($fields['cpf'])){
-        $update_values['nfe_document_number'] = preg_replace("/[^0-9]/","", Tools::getValue($fields['cpf']));
-      }
-
-    }else if($type == $cnpj_ref){
-      if(Tools::getValue($fields['cnpj'])){
+    
+    // Set user
+    $is_cnpj = str_replace( array('/', '.', '-'), '', Tools::getValue($fields['cnpj']));
+    if ($is_cnpj && strlen($is_cnpj) == 14) $is_cnpj = true; else $is_cnpj = false;
+    
+    if ($is_cnpj){
+      
+      if (Tools::getValue($fields['cnpj'])){
+        
+        $update_values['nfe_document_type'] = 'cnpj';
         $update_values['nfe_document_number'] = preg_replace("/[^0-9]/","", Tools::getValue($fields['cnpj']));
+        
+        if (Tools::getValue($fields['razao_social'])) $update_values['nfe_razao_social'] = pSQL(Tools::getValue($fields['razao_social']));
+        else $update_values['nfe_razao_social'] = '';
+        
+        if (Tools::getValue($fields['ie'])) $update_values['nfe_pj_ie'] = pSQL(Tools::getValue($fields['ie']));
+        else $update_values['nfe_pj_ie'] = '';
+          
       }
 
-      if(Tools::getValue($fields['razao_social'])){
-        $update_values['nfe_razao_social'] = pSQL(Tools::getValue($fields['razao_social']));
+    } else {
+   
+      if (Tools::getValue($fields['cpf'])){
+        
+        $update_values['nfe_document_type'] = 'cpf';
+        $update_values['nfe_document_number'] = preg_replace("/[^0-9]/","", Tools::getValue($fields['cpf']));
+        $update_values['nfe_razao_social'] = '';
+        $update_values['nfe_pj_ie'] = '';
+        
       }
 
-      if(Tools::getValue($fields['ie'])){
-        $update_values['nfe_pj_ie'] = pSQL(Tools::getValue($fields['ie']));
-      }
     }
 
     /***********
@@ -1740,24 +1685,55 @@ class WebmaniaBrNFe extends Module{
         $discounts_applied[] = $cart_rule->reduction_percent;
       }
     }
-
-
+    
+    // Get customer
     $customer = $order->getCustomer();
+    
+    // Get Custom Fields
+    $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
+    $number_status = Configuration::get($this->name.'numero_compl_status');
+    $bairro_status = Configuration::get($this->name.'bairro_status');
 
-
-
-
+    if ($cpf_cnpj_status == 'on'){
+      
+      $fields = array(
+        'cpf'            => 'nfe_document_number',
+        'cnpj'           => 'nfe_document_number',
+        'razao_social'   => 'nfe_razao_social',
+        'ie'             => 'nfe_pj_ie'
+      );
+      
+    } else {
+      
+      $fields = array(
+        'cpf'            => Configuration::get($this->name.'cpf_field'),
+        'cnpj'           => Configuration::get($this->name.'cnpj_field'),
+        'razao_social'   => Configuration::get($this->name.'razao_social_field'),
+        'ie'             => Configuration::get($this->name.'cnpj_ie_field')
+      );
+      
+    }
+    
+    if ($number_status == 'on') $fields['address_number'] = 'address_number';
+    else $fields['address_number'] = Configuration::get($this->name.'numero_field');
+    
+    if ($bairro_status == 'on') $fields['bairro'] = 'bairro';
+    else $fields['bairro'] = Configuration::get($this->name.'bairro_field');
+    
+    // Search Database
     $address = new Address($order->id_address_delivery);
     $state = new State($address->id_state);
     $products = $order->getProducts();
-    $customer_custom = Db::getInstance()->getRow('SELECT nfe_document_type, nfe_document_number, nfe_razao_social, nfe_pj_ie FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
-    $address_custom = Db::getInstance()->getRow('SELECT address_number FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
-
-    if(_MAIN_PS_VERSION_ == '1.7'){
-      $address_custom = Db::getInstance()->getRow('SELECT address_number, bairro FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
-    }
-
-    $tipo_pessoa = $customer_custom['nfe_document_type'];
+    $customer_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
+    $address_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
+    
+    // Set Document Type
+    $is_cnpj = $customer_custom[$fields['cnpj']];
+    $is_cnpj = str_replace( array('/', '.', '-'), '', $customer_custom[$fields['cnpj']]);
+    if ($is_cnpj && strlen($is_cnpj) == 14) $is_cnpj = true; else $is_cnpj = false;
+    if ($is_cnpj) $tipo_pessoa = 'cnpj'; else $tipo_pessoa = 'cpf';
+    
+    // Array start
     $data = array(
         'ID' => $order->id, // Número do pedido
         'url_notificacao' => Tools::getHttpHost(true).__PS_BASE_URI__.'?retorno_nfe='.$uniq_key.'&order_id='.$order->id,
@@ -1795,16 +1771,19 @@ class WebmaniaBrNFe extends Module{
      //Client
      if($tipo_pessoa == 'cnpj'){
 
-       $cnpj = $this->cnpj($customer_custom['nfe_document_number']);
+       $cnpj = $this->cnpj($customer_custom[$fields['cnpj']]);
        if( !$cnpj && isset($customer->cnpj) ) $cnpj = $customer->cnpj;
+       
+       if (!$customer_custom[$fields['razao_social']]) $razao_social = $customer->firstname.' '.$customer->lastname;
+       else $razao_social = $customer_custom[$fields['razao_social']];
 
        $data['cliente'] = array(
          'cnpj' => $cnpj, // (pessoa jurídica) Número do CNPJ
-         'razao_social' => $customer_custom['nfe_razao_social'], // (pessoa jurídica) Razão Social
-         'ie' => $customer_custom['nfe_pj_ie'], // (pessoa jurídica) Número da Inscrição Estadual
+         'razao_social' => $razao_social, // (pessoa jurídica) Razão Social
+         'ie' => $customer_custom[$fields['ie']], // (pessoa jurídica) Número da Inscrição Estadual
          'endereco' => $address->address1, // Endereço de entrega dos produtos
          'complemento' => $address->other, // Complemento do endereço de entrega
-         'numero' => $address_custom['address_number'], // Número do endereço de entrega
+         'numero' => $address_custom[$fields['address_number']], // Número do endereço de entrega
          'bairro' => $address->address2, // Bairro do endereço de entrega
          'cidade' => $address->city, // Cidade do endereço de entrega
          'uf' => $state->iso_code, // Estado do endereço de entrega
@@ -1812,9 +1791,10 @@ class WebmaniaBrNFe extends Module{
          'telefone' => $address->phone, // Telefone do cliente
          'email' => $customer->email // E-mail do cliente para envio da NF-e
        );
+       
      }else{
 
-       $cpf = $this->cpf($customer_custom['nfe_document_number']);
+       $cpf = $this->cpf($customer_custom[$fields['cpf']]);
        if( !$cpf && isset($customer->cpf) ) $cpf = $customer->cpf;
 
        $data['cliente'] = array(
@@ -1822,7 +1802,7 @@ class WebmaniaBrNFe extends Module{
          'nome_completo' => $customer->firstname.' '.$customer->lastname, // (pessoa fisica) Nome completo
          'endereco' => $address->address1, // Endereço de entrega dos produtos
          'complemento' => $address->other, // Complemento do endereço de entrega
-         'numero' => $address_custom['address_number'], // Número do endereço de entrega
+         'numero' => $address_custom[$fields['address_number']], // Número do endereço de entrega
          'bairro' => $address->address2, // Bairro do endereço de entrega
          'cidade' => $address->city, // Cidade do endereço de entrega
          'uf' => $state->iso_code, // Estado do endereço de entrega
@@ -1833,7 +1813,7 @@ class WebmaniaBrNFe extends Module{
      }
 
      if(_MAIN_PS_VERSION_ == '1.7'){
-       $data['cliente']['bairro'] = $address_custom['bairro'];
+       $data['cliente']['bairro'] = $address_custom[$fields['bairro']];
        $data['cliente']['complemento'] = $address->address2;
      }
 

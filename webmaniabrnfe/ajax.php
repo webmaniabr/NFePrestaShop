@@ -64,7 +64,7 @@ function getCategoryNcm($id_category){
 }
 
 function checkForDocument($address_id, $customer_id){
-  $result_customer = Db::getInstance()->executeS('SELECT nfe_document_number, nfe_document_type FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer_id);
+  $result_customer = Db::getInstance()->executeS('SELECT nfe_document_number, nfe_document_type, nfe_razao_social, nfe_pj_ie FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer_id);
 
   $result = array();
 
@@ -73,6 +73,8 @@ function checkForDocument($address_id, $customer_id){
   }else{
     $result['document_number'] = $result_customer[0]['nfe_document_number'];
     $result['document_type'] = $result_customer[0]['nfe_document_type'];
+    $result['razao_social'] = $result_customer[0]['nfe_razao_social'];
+    $result['ie'] = $result_customer[0]['nfe_pj_ie'];
   }
 
   echo json_encode($result);
