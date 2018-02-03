@@ -95,13 +95,13 @@ jQuery(document).ready(function(){
       },
 
       isMaskFieldOn: function(){
-        if(typeof mask_doc_fields == 'boolean'){
+        if (typeof mask_doc_fields !== 'undefined' && mask_doc_fields == 'on'){
           return true;
         }
         return false;
       },
       isAutoAddressOn: function(){
-        if(typeof fill_address == 'boolean'){
+        if (typeof fill_address !== 'undefined' && fill_address == 'on'){
           return true;
         }
         return false;
@@ -187,12 +187,9 @@ jQuery(document).ready(function(){
     }
   });
 
-  
-
-
   $('#submitAddress').click(function(e){
 
-    if(typeof add_numero_compl == 'boolean'){
+    if(typeof numero_compl_status !== 'undefined' && numero_compl_status == 'on'){
       var emptyRequiredFields = AddressControllerWmbr.utils.validateFields();
 
       if(emptyRequiredFields.length > 0){
@@ -201,8 +198,9 @@ jQuery(document).ready(function(){
         emptyRequiredFields.forEach(function(name, index){
           $('input[name="'+name+'"]').addClass('required-error');
         });
-
-        $('body').scrollTop(scrollElement.offset().top - 100);
+        
+        $('html, body').animate({scrollTop: (scrollElement.offset().top - 50)});
+        
       }
     }
 

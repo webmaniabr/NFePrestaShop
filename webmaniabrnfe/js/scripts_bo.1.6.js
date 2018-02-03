@@ -35,7 +35,7 @@ jQuery(document).ready(function(){
       },
 
       isEditAddressPage: function(){
-
+        
         if(typeof id_address_wmbr != 'undefined'){
           return true;
         }
@@ -282,7 +282,7 @@ jQuery(document).ready(function(){
       this.events.init();
 
       if(this.pages.isCustomerPage()){
-
+        
         if (tipo_pessoa_enabled == 'on') this.DOM.insertTipoPessoa();
 
         if(this.pages.isEditCustomerPage()){

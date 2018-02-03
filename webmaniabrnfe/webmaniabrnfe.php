@@ -1727,6 +1727,12 @@ class WebmaniaBrNFe extends Module{
     $customer_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
     $address_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
     
+    // Identify if customer custom fields is located in _address database
+    if (isset($address_custom[$fields['cpf']])) $customer_custom[$fields['cpf']] = $address_custom[$fields['cpf']]; 
+    if (isset($address_custom[$fields['cnpj']])) $customer_custom[$fields['cnpj']] = $address_custom[$fields['cnpj']]; 
+    if (isset($address_custom[$fields['razao_social']])) $customer_custom[$fields['razao_social']] = $address_custom[$fields['razao_social']];
+    if (isset($address_custom[$fields['ie']])) $customer_custom[$fields['ie']] = $address_custom[$fields['ie']];
+    
     // Set Document Type
     $is_cnpj = $customer_custom[$fields['cnpj']];
     $is_cnpj = str_replace( array('/', '.', '-'), '', $customer_custom[$fields['cnpj']]);
