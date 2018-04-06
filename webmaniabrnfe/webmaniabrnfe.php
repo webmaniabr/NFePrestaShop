@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.6.9';
+    $this->version = '2.6.9.1';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -2100,7 +2100,7 @@ class WebmaniaBrNFe extends Module{
 
   public function processBulkEmitirNfe(){
 
-    if( Tools::isSubmit('bulkEmitirNfe') && Tools::isSubmit('wmbr_bulk_action') ){
+    if( Tools::isSubmit('submitBulkemitirNfeorder') ){
       $values = Tools::getValue('orderBox');
       foreach($values as $orderID){
         $this->emitirNfe($orderID);
