@@ -113,3 +113,45 @@ form.webmaniabrnfe label{
   width: auto;
   margin-bottom:10px;
 }
+
+
+/**** TRANSPORTADORAS ****/
+
+.carrier-item {
+    padding: 10px 15px;
+    background-color: #f5f8f9;
+    border-radius: 3px;
+    margin-bottom: 5px;
+    max-width: 600px;
+    cursor: pointer;
+    position: relative;
+    border: 1px solid #c7d6db;
+}
+
+.carrier-item:last-child{
+  margin-bottom: 15px;
+}
+
+.carrier-item p {
+    margin-bottom: 0;
+}
+
+.carrier-item .delete {
+    background-color: #dc4e4e;
+    color: #FFF;
+    display: inline-block;
+    width: 20px;
+    text-align: center;
+    border-radius: 50%;
+    position: absolute;
+    right: 10px;
+    top: 8px;
+    padding-top: 1px;
+    padding-bottom: 2px;
+    cursor: pointer;
+}
+
+.carrier-item p span {
+    color: #1f90cf;
+    font-weight: 600;
+}

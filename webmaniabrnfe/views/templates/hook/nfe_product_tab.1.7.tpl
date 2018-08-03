@@ -18,10 +18,19 @@
     </div>
 
     <div class="form-group">
-      <label class="form-control-label">Código de Barras EAN</label>
+      <label class="form-control-label">GTIN (Antigo código EAN)</label>
       <div class="row">
         <div class="col-md-6">
           <input type="text" name="nfe_ean_bar_code" value="{$ean_bar_code}" class="form-control"/>
+        </div>
+      </div>
+    </div>
+    
+    <div class="form-group">
+      <label class="form-control-label">GTIN Tributável</label>
+      <div class="row">
+        <div class="col-md-6">
+          <input type="text" name="nfe_gtin_tributavel" value="{$gtin_tributavel}" class="form-control"/>
         </div>
       </div>
     </div>
@@ -43,7 +52,41 @@
         </div>
       </div>
     </div>
-
+    
+    <div class="form-group">
+      <label class="form-control-label">CNPJ do fabricante da mercadoria</label>
+      <div class="row">
+        <div class="col-md-6">
+          <input type="text" name="nfe_cnpj_fabricante" value="{$cnpj_fabricante}" class="form-control"/>  
+        </div>
+      </div>
+    </div>
+    
+    <div class="form-group">
+      <label class="form-control-label">Indicador de escala relevante</label>
+      <div class="row">
+        <div class="col-md-6">
+          <select class="form-control" name="nfe_ind_escala" value="{$nfe_ind_escala}">
+            <option value="">Selecionar</option>
+              {assign var=options value=[
+                'S' => 'S - Produzido em Escala Relevante',
+                'N' => 'N - Produzido em Escala NÃO Relevante']
+              }
+            {foreach from=$options item=item key=key}
+            {assign var=select value=''}
+            {if $key == $ind_escala}
+            {$select = 'selected'}
+            {else}
+            {$select = ''}
+            {/if}
+            <option value="{$key}" {$select}>{$item}</option>
+            {/foreach}
+          </select>
+        </div>
+      </div>
+    </div>
+    
+    
     <div class="form-group">
       <label class="form-control-label">Origem</label>
       <div class="row">

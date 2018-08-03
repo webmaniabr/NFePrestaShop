@@ -4,11 +4,28 @@
 require_once(dirname(__FILE__).'../../../config/config.inc.php');
 require_once(dirname(__FILE__).'../../../init.php');
 
+
+
 if( Tools::getValue('adminToken') != Tools::getAdminToken('7Br2ZZwaRD') ){
   exit;
 }
 
+
 switch (Tools::getValue('method')) {
+  
+  case 'getPSColumns':
+    
+    $table_name = pSql(Tools::getValue('table_name'));
+    $results = Db::getInstance()->executeS("SELECT column_name from information_schema.columns where table_name = '$table_name'");
+    
+    $columns = array_map(function($element){
+      return $element['column_name'];
+    }, $results);
+    
+    echo json_encode(array('results' => $columns));
+    die();
+    break;
+  
   case 'getAddressInfo' :
 
     $address = new Address(Tools::getValue('addressID'));

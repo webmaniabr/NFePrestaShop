@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.6.9.1';
+    $this->version = '2.7.0';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -73,9 +73,12 @@ class WebmaniaBrNFe extends Module{
       'actionCategoryUpdate',
       'actionObjectAddressUpdateAfter',
       'actionObjectAddressAddAfter',
+      'actionObjectUpdateAfter',
       'actionObjectCustomerAddAfter',
       'actionObjectCustomerUpdateAfter',
-      'displayBackOfficeCategory'
+      'displayBackOfficeCategory',
+      'displayAdminOrderTabShip',
+      'displayAdminOrderContentShip'
     );
 
 
@@ -107,16 +110,10 @@ class WebmaniaBrNFe extends Module{
 
   public function uninstall(){
 
-    if(!parent::uninstall() || !$this->alterTable('remove')){
+    if(!parent::uninstall()){
       return false;
     }
 
-    $config_fields = $this->getConfigInitValues();
-    foreach($config_fields as $key => $value){
-      if(!Configuration::deleteByName($key)){
-        return false;
-      }
-    }
     return true;
 
   }
@@ -128,9 +125,13 @@ class WebmaniaBrNFe extends Module{
     if(Tools::isSubmit('submit'.$this->name)){
       $fields = $this->getConfigInitValues();
       foreach($fields as $key => $value){
+        
         $input_value = strval(Tools::getValue($key));
         if($input_value){
+            
           if(Validate::isGenericName($input_value)){
+            Configuration::updateValue($key, $input_value);
+          }elseif($key == 'webmaniabrnfecarriers'){
             Configuration::updateValue($key, $input_value);
           }else{
             $output .= $this->displayError($this->l('Invalid Configuration Value'));
@@ -168,8 +169,36 @@ class WebmaniaBrNFe extends Module{
     return $options;
 
   }
+  
+  public function get_payment_methods_options() {
+
+    $options = array();
+
+    $default_language = (int)Configuration::get('PS_LANG_DEFAULT');
+    $methods = PaymentModule::getInstalledPaymentModules();
+    
+    foreach($methods as $payment_method){
+      $options[] = array(
+        'value' => $payment_method['name'],
+        'label' => $payment_method['name'],
+      );
+    }
+
+    return $options;
+
+  }
 
   public function displayForm(){
+    
+    ob_start();
+    
+    require_once('views/templates/settings-page.php');
+    $html = ob_get_clean();
+    
+    return $html;
+    
+    
+    
     $default_language = (int)Configuration::get('PS_LANG_DEFAULT');
 
     $select_options = array(
@@ -279,7 +308,7 @@ class WebmaniaBrNFe extends Module{
           'type' => 'radio',
           'label' => $this->l('Emissão Automática'),
           'name' => $this->name.'automatic_emit',
-          'desc' => $this->l('Emitir automaticamente a NF-e sempre que que um pagamento for confirmado'),
+          'desc' => $this->l('Emitir sautomaticamente a NF-e sempre que que um pagamento for confirmado'),
           'values' => array(
             array(
               'id' => 'on',
@@ -298,6 +327,7 @@ class WebmaniaBrNFe extends Module{
           'type' => 'radio',
           'label' => $this->l('Envio automático de email'),
           'name' => $this->name.'envio_email',
+          'desc' => $this->l('Atenção: O email será enviado mesmo para notas emitidas em ambiente de homologação!'),
           'values' => array(
             array(
               'id' => 'on',
@@ -658,7 +688,7 @@ class WebmaniaBrNFe extends Module{
     );
 
     $helper->fields_value = $this->getConfigFieldsValues();
-    return $helper->generateForm($fields_form);
+    return $helper->generateForm($fields_form).'<span class="teste"></span>';
   }
 
   public function getConfigFieldsValues(){
@@ -672,9 +702,12 @@ class WebmaniaBrNFe extends Module{
       $this->name.'automatic_emit' => Configuration::get($this->name.'automatic_emit'),
       $this->name.'operation_type' => Configuration::get($this->name.'operation_type'),
       $this->name.'tax_class' => Configuration::get($this->name.'tax_class'),
-      $this->name.'ean_barcode' => Configuration::get($this->name.'ean_barcode'),
+      $this->name.'ean_barcode'     => Configuration::get($this->name.'ean_barcode'),
+      $this->name.'gtin_tributavel' => Configuration::get($this->name.'gtin_tributavel'),
       $this->name.'ncm_code' => Configuration::get($this->name.'ncm_code'),
       $this->name.'cest_code' => Configuration::get($this->name.'cest_code'),
+      $this->name.'cnpj_fabricante' => Configuration::get($this->name.'cnpj_fabricante'),
+      $this->name.'ind_escala' => Configuration::get($this->name.'ind_escala'),
       $this->name.'product_source' => Configuration::get($this->name.'product_source'),
       $this->name.'person_type_fields' => Configuration::get($this->name.'person_type_fields'),
       $this->name.'mask_fields' => Configuration::get($this->name.'mask_fields'),
@@ -704,13 +737,26 @@ class WebmaniaBrNFe extends Module{
       $this->name.'transp_cep'     => Configuration::get($this->name.'transp_cep'),
       $this->name.'transp_city'    => Configuration::get($this->name.'transp_city'),
       $this->name.'transp_uf'      => Configuration::get($this->name.'transp_uf'),
+      $this->name.'carriers'       => Configuration::get($this->name.'carriers'),
+      
+      $this->name.'docscolumn_cpf'   => Configuration::get($this->name.'docscolumn_cpf'),
+      $this->name.'docscolumn_cnpj'  => Configuration::get($this->name.'docscolumn_cnpj'),
+      $this->name.'docscolumn_rs'    => Configuration::get($this->name.'docscolumn_rs'),
+      $this->name.'docscolumn_ie'    => Configuration::get($this->name.'docscolumn_ie'),
+      $this->name.'docstable_cpf'    => Configuration::get($this->name.'docstable_cpf'),
+      $this->name.'docstable_cnpj'   => Configuration::get($this->name.'docstable_cnpj'),
+      $this->name.'docstable_rs'     => Configuration::get($this->name.'docstable_rs'),
+      $this->name.'docstable_ie'     => Configuration::get($this->name.'docstable_ie'),
     );
+    
+    
+    
 
   }
 
   function getConfigInitValues(){
 
-    return array(
+   $arr =  array(
       $this->name.'consumer_key' => '',
       $this->name.'consumer_secret' => '',
       $this->name.'access_token' => '',
@@ -720,8 +766,11 @@ class WebmaniaBrNFe extends Module{
       $this->name.'operation_type' => '',
       $this->name.'tax_class' => '',
       $this->name.'ean_barcode' => '',
+      $this->name.'gtin_tributavel' => '',
       $this->name.'ncm_code' => '',
       $this->name.'cest_code' => '',
+      $this->name.'cnpj_fabricante' => '',
+      $this->name.'ind_escala' => '',
       $this->name.'product_source' => '0',
       $this->name.'person_type_fields' => 'on',
       $this->name.'mask_fields' => 'off',
@@ -753,7 +802,24 @@ class WebmaniaBrNFe extends Module{
       $this->name.'transp_cep'     => '',
       $this->name.'transp_city'    => '',
       $this->name.'transp_uf'      => '',
+      $this->name.'carriers'       => '',
+      $this->name.'docscolumn_cpf' => '',
+      $this->name.'docscolumn_cnpj'  => '',
+      $this->name.'docscolumn_rs'    => '',
+      $this->name.'docscolumn_ie'    => '',
+      $this->name.'docstable_cpf'    => '',
+      $this->name.'docstable_cnpj'   => '',
+      $this->name.'docstable_rs'     => '',
+      $this->name.'docstable_ie'     => ''
+      
     );
+    
+    $payment_methods = $this->get_payment_methods_options();
+    foreach($payment_methods as $method){
+      $arr[$this->name.'payment_'.$method['value']] = '';
+    }
+    
+    return $arr;
 
   }
 
@@ -853,18 +919,30 @@ class WebmaniaBrNFe extends Module{
       $this->save_order_transporte_info($order_id);
     }
 
+  }
+  
+  public function hookDisplayAdminOrderTabShip($order, $products, $customer){
+    
     $include_shipping_info = Configuration::get($this->name.'transp_include');
-
-    if($include_shipping_info == 'on'){
-
-      $method = Configuration::get($this->name.'transp_method');
-
-      if($method == $order->id_carrier){
-        $this->display_order_transporte_info($order_id);
-      }
-
-    }
-
+    if($include_shipping_info != 'on') return false;
+    
+    return '<li><a href="#nfe-shipping-info">Transporte (NF-e)</a></li>';
+    
+  }
+  
+  
+  public function hookDisplayAdminOrderContentShip($order, $products, $customer){
+    
+    $include_shipping_info = Configuration::get($this->name.'transp_include');
+    if($include_shipping_info != 'on') return false;
+    
+    ob_start();
+    require_once('views/templates/order_nfe_shipping_info.php');
+    
+    $html = ob_get_clean();
+    
+    return $html;
+    
   }
 
 
@@ -1070,8 +1148,11 @@ class WebmaniaBrNFe extends Module{
       $this->context->smarty->assign(array(
         'tax_class' => $values[0]['nfe_tax_class'],
         'ean_bar_code' => $values[0]['nfe_ean_bar_code'],
+        'gtin_tributavel' => $values[0]['nfe_gtin_tributavel'],
         'ncm_code' => $values[0]['nfe_ncm_code'],
         'cest_code' => $values[0]['nfe_cest_code'],
+        'cnpj_fabricante' => $values[0]['nfe_cnpj_fabricante'],
+        'ind_escala' => $values[0]['nfe_ind_escala'],
         'product_source' => $values[0]['nfe_product_source'],
         'ignorar_nfe' => $values[0]['nfe_ignorar_nfe']
       ));
@@ -1094,8 +1175,11 @@ class WebmaniaBrNFe extends Module{
     if(!Db::getInstance()->update('product', array(
       'nfe_tax_class'=> pSQL(Tools::getValue('nfe_tax_class')),
       'nfe_ean_bar_code' => pSQL(Tools::getValue('nfe_ean_bar_code')),
+      'nfe_gtin_tributavel' => pSQL(Tools::getValue('nfe_gtin_tributavel')),
       'nfe_ncm_code' => pSQL(Tools::getValue('nfe_ncm_code')),
       'nfe_cest_code' => pSQL(Tools::getValue('nfe_cest_code')),
+      'nfe_cnpj_fabricante' => pSQL(Tools::getValue('nfe_cnpj_fabricante')),
+      'nfe_ind_escala' => pSQL(Tools::getValue('nfe_ind_escala')),
       'nfe_product_source' => pSQL(Tools::getValue('nfe_product_source')),
       'nfe_ignorar_nfe' => pSQL(Tools::getValue('nfe_ignorar_nfe'))
     ),'id_product = ' .$id_product )){
@@ -1458,7 +1542,7 @@ class WebmaniaBrNFe extends Module{
   }
 
   public function updateAddressInfo( $address_id ){
-
+ 
     $number_status = Configuration::get($this->name.'numero_compl_status');
     $update_values = array();
     $context_type = Context::getContext()->controller->controller_type;
@@ -1509,6 +1593,15 @@ class WebmaniaBrNFe extends Module{
     $address_id = $params['object']->id;
     $this->updateAddressInfo($address_id);
 
+  }
+  
+  public function hookActionObjectUpdateAfter( $params ){
+    
+    if( is_a($params['object'], 'Address')){
+      $address_id = $params['object']->id;
+      $this->updateAddressInfo($address_id);
+    }
+    
   }
 
 
@@ -1666,6 +1759,7 @@ class WebmaniaBrNFe extends Module{
   public function getOrderData($orderID){
 
     $order = new Order($orderID);
+    
     $discounts = $order->getDiscounts(true);
     $discounts_applied = array(); // Only percentage
 
@@ -1688,6 +1782,7 @@ class WebmaniaBrNFe extends Module{
     
     // Get customer
     $customer = $order->getCustomer();
+    $customer_docs = array();
     
     // Get Custom Fields
     $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
@@ -1696,24 +1791,80 @@ class WebmaniaBrNFe extends Module{
 
     if ($cpf_cnpj_status == 'on'){
       
-      $fields = array(
-        'cpf'            => 'nfe_document_number',
-        'cnpj'           => 'nfe_document_number',
-        'razao_social'   => 'nfe_razao_social',
-        'ie'             => 'nfe_pj_ie'
+      $result = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
+      
+      $customer_docs = array(
+        'cpf'          => $result['nfe_document_number'],
+        'cnpj'         => $result['nfe_document_number'],
+        'razao_social' => $result['nfe_razao_social'],
+        'ie'           => $result['nfe_pj_ie']
       );
       
     } else {
       
-      $fields = array(
-        'cpf'            => Configuration::get($this->name.'cpf_field'),
-        'cnpj'           => Configuration::get($this->name.'cnpj_field'),
-        'razao_social'   => Configuration::get($this->name.'razao_social_field'),
-        'ie'             => Configuration::get($this->name.'cnpj_ie_field')
-      );
+      $customer_docs = array();
+      
+      if(!Configuration::get($this->name.'docscolumn_cpf')){
+        
+        $fields = array(
+          'cpf'            => Configuration::get($this->name.'cpf_field'),
+          'cnpj'           => Configuration::get($this->name.'cnpj_field'),
+          'razao_social'   => Configuration::get($this->name.'razao_social_field'),
+          'ie'             => Configuration::get($this->name.'cnpj_ie_field')
+        );
+        
+        $address = new Address($order->id_address_delivery);
+        $customer_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
+        $address_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
+        
+        if(isset($customer_custom[$fields['cpf']])) $customer_docs['cpf'] = $customer_custom[$fields['cpf']];
+        if(isset($customer_custom[$fields['cnpj']])) $customer_docs['cnpj'] = $customer_custom[$fields['cnpj']];
+        if(isset($customer_custom[$fields['razao_social']])) $customer_docs['razao_social'] = $customer_custom[$fields['razao_social']];
+        if(isset($customer_custom[$fields['ie']])) $customer_docs['ie'] = $customer_custom[$fields['ie']];
+        
+        // Identify if customer custom fields is located in _address database
+        if (isset($address_custom[$fields['cpf']])) $customer_docs['cpf'] = $address_custom[$fields['cpf']]; 
+        if (isset($address_custom[$fields['cnpj']])) $customer_docs['cnpj'] = $address_custom[$fields['cnpj']]; 
+        if (isset($address_custom[$fields['razao_social']])) $customer_docs['razao_social'] = $address_custom[$fields['razao_social']];
+        if (isset($address_custom[$fields['ie']])) $customer_docs['ie'] = $address_custom[$fields['ie']];
+        
+      }else{
+        
+        $map = array(
+          'cpf' => array(
+            'table'  => Configuration::get($this->name.'docstable_cpf'),
+            'column' => Configuration::get($this->name.'docscolumn_cpf')
+          ),
+          'cnpj' => array(
+            'table'  => Configuration::get($this->name.'docstable_cnpj'),
+            'column' => Configuration::get($this->name.'docscolumn_cnpj')
+          ),
+          'razao_social' => array(
+            'table'  => Configuration::get($this->name.'docstable_rs'),
+            'column' => Configuration::get($this->name.'docscolumn_rs'),
+          ),
+          'ie' => array(
+            'table'  => Configuration::get($this->name.'docstable_ie'),
+            'column' => Configuration::get($this->name.'docscolumn_ie')
+          )
+        );
+        
+        foreach($map as $key => $doc){
+          
+          $table  = $doc['table'];
+          $column = $doc['column'];
+          $query = "SELECT $column FROM $table WHERE id_customer = '$customer->id'";
+          
+          $val = Db::getInstance()->getValue($query);
+          $customer_docs[$key] = $val;
+          
+        }
+        
+      }
       
     }
     
+
     if ($number_status == 'on') $fields['address_number'] = 'address_number';
     else $fields['address_number'] = Configuration::get($this->name.'numero_field');
     
@@ -1724,20 +1875,13 @@ class WebmaniaBrNFe extends Module{
     $address = new Address($order->id_address_delivery);
     $state = new State($address->id_state);
     $products = $order->getProducts();
-    $customer_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
+    
     $address_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
     
-    // Identify if customer custom fields is located in _address database
-    if (isset($address_custom[$fields['cpf']])) $customer_custom[$fields['cpf']] = $address_custom[$fields['cpf']]; 
-    if (isset($address_custom[$fields['cnpj']])) $customer_custom[$fields['cnpj']] = $address_custom[$fields['cnpj']]; 
-    if (isset($address_custom[$fields['razao_social']])) $customer_custom[$fields['razao_social']] = $address_custom[$fields['razao_social']];
-    if (isset($address_custom[$fields['ie']])) $customer_custom[$fields['ie']] = $address_custom[$fields['ie']];
-    
     // Set Document Type
-    $is_cnpj = $customer_custom[$fields['cnpj']];
-    $is_cnpj = str_replace( array('/', '.', '-'), '', $customer_custom[$fields['cnpj']]);
+    /*$is_cnpj = str_replace( array('/', '.', '-'), '', $customer_custom[$fields['cnpj']]);
     if ($is_cnpj && strlen($is_cnpj) == 14) $is_cnpj = true; else $is_cnpj = false;
-    if ($is_cnpj) $tipo_pessoa = 'cnpj'; else $tipo_pessoa = 'cpf';
+    if ($is_cnpj) $tipo_pessoa = 'cnpj'; else $tipo_pessoa = 'cpf';*/
     
     // Array start
     $data = array(
@@ -1752,13 +1896,20 @@ class WebmaniaBrNFe extends Module{
      );
 
      $data['pedido'] = array(
-         'pagamento' => 0, // Indicador da forma de pagamento
          'presenca' => 2, // Indicador de presença do comprador no estabelecimento comercial no momento da operação
          'modalidade_frete' => 0, // Modalidade do frete
          'frete' => number_format($order->total_shipping, 2, '.', ''), // Total do frete
          'desconto' => number_format($order->total_discounts_tax_incl, 2, '.', ''), // Total do desconto
          'total' => number_format($order->total_paid_tax_incl, 2, '.', ''),  // Total do pedido - sem descontos
      );
+     
+     
+     $payment_module = $order->module;
+     $payment_method = Configuration::get('webmaniabrnfepayment_'.$payment_module);
+     
+     if($payment_method){
+       $data['pedido']['forma_pagamento'] = $payment_method;
+     }
 
      //Informações COmplementares ao Fisco
      $fiscoinf = Configuration::get($this->name.'fisco_inf');
@@ -1774,33 +1925,43 @@ class WebmaniaBrNFe extends Module{
        $data['pedido']['informacoes_complementares'] = $consumidorinf;
      }
 
+
+      $tipo_pessoa = 'cpf';
+      
+      if($customer_docs['cnpj'] && $customer_docs['cnpj'] != $customer_docs['cpf']){
+        $tipo_pessoa = 'cnpj';
+      }else if( $this->is_cnpj($customer_docs['cpf']) ){
+        $tipo_pessoa = 'cnpj';
+      }
+        
+      
      //Client
      if($tipo_pessoa == 'cnpj'){
 
-       $cnpj = $this->cnpj($customer_custom[$fields['cnpj']]);
+       $cnpj = $this->cnpj($customer_docs['cnpj']);
        if( !$cnpj && isset($customer->cnpj) ) $cnpj = $customer->cnpj;
        
        if (!$customer_custom[$fields['razao_social']]) $razao_social = $customer->firstname.' '.$customer->lastname;
        else $razao_social = $customer_custom[$fields['razao_social']];
 
        $data['cliente'] = array(
-         'cnpj' => $cnpj, // (pessoa jurídica) Número do CNPJ
-         'razao_social' => $razao_social, // (pessoa jurídica) Razão Social
-         'ie' => $customer_custom[$fields['ie']], // (pessoa jurídica) Número da Inscrição Estadual
-         'endereco' => $address->address1, // Endereço de entrega dos produtos
-         'complemento' => $address->other, // Complemento do endereço de entrega
-         'numero' => $address_custom[$fields['address_number']], // Número do endereço de entrega
-         'bairro' => $address->address2, // Bairro do endereço de entrega
-         'cidade' => $address->city, // Cidade do endereço de entrega
-         'uf' => $state->iso_code, // Estado do endereço de entrega
-         'cep' => $address->postcode, // CEP do endereço de entrega
-         'telefone' => $address->phone, // Telefone do cliente
-         'email' => $customer->email // E-mail do cliente para envio da NF-e
+         'cnpj'         => $customer_docs['cnpj'], // (pessoa jurídica) Número do CNPJ
+         'razao_social' => $customer_docs['razao_social'], // (pessoa jurídica) Razão Social
+         'ie'           => $customer_docs['ie'], // (pessoa jurídica) Número da Inscrição Estadual
+         'endereco'     => $address->address1, // Endereço de entrega dos produtos
+         'complemento'  => $address->other, // Complemento do endereço de entrega
+         'numero'       => $address_custom[$fields['address_number']], // Número do endereço de entrega
+         'bairro'       => $address->address2, // Bairro do endereço de entrega
+         'cidade'       => $address->city, // Cidade do endereço de entrega
+         'uf'           => $state->iso_code, // Estado do endereço de entrega
+         'cep'          => $address->postcode, // CEP do endereço de entrega
+         'telefone'     => $address->phone, // Telefone do cliente
+         'email'        => $customer->email // E-mail do cliente para envio da NF-e
        );
        
      }else{
 
-       $cpf = $this->cpf($customer_custom[$fields['cpf']]);
+       $cpf = $this->cpf($customer_docs['cpf']);
        if( !$cpf && isset($customer->cpf) ) $cpf = $customer->cpf;
 
        $data['cliente'] = array(
@@ -1849,9 +2010,18 @@ class WebmaniaBrNFe extends Module{
        /*
        * Specific product values
        */
-       $codigo_ean = Db::getInstance()->getValue('SELECT nfe_ean_bar_code FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
+       //Antigo EAN
+       $gtin = Db::getInstance()->getValue('SELECT nfe_ean_bar_code FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
+       
+       $gtin_tributavel = Db::getInstance()->getValue('SELECT nfe_gtin_tributavel FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
+       
        $codigo_ncm = Db::getInstance()->getValue('SELECT nfe_ncm_code FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
        $codigo_cest = Db::getInstance()->getValue('SELECT nfe_cest_code FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
+       
+       $cnpj_fabricante = Db::getInstance()->getValue('SELECT nfe_cnpj_fabricante FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
+       
+       $ind_escala = Db::getInstance()->getValue('SELECT nfe_ind_escala FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
+       
        $origem = Db::getInstance()->getValue('SELECT nfe_product_source FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
        $imposto = Db::getInstance()->getValue('SELECT nfe_tax_class FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
        $peso = $item['product_weight'];
@@ -1868,7 +2038,8 @@ class WebmaniaBrNFe extends Module{
        */
        if (!$peso) $peso = '0.100';
        $peso = number_format($peso, 3, '.', '');
-       if (!$codigo_ean) $codigo_ean = Configuration::get($this->name.'ean_barcode');
+       if (!$gtin) $gtin = Configuration::get($this->name.'ean_barcode');
+       if (!$gtin_tributavel) $gtin_tributavel = Configuration::get($this->name.'gtin_tributavel');
        if (!$codigo_ncm){
          $codigo_ncm = $this->get_category_ncm($category_id);
          if(!$codigo_ncm){
@@ -1878,6 +2049,16 @@ class WebmaniaBrNFe extends Module{
        if (!$codigo_cest) $codigo_cest = Configuration::get($this->name.'cest_code');
        if (!is_numeric($origem) || $origem == -1) $origem = Configuration::get($this->name.'product_source');
        if (!$imposto) $imposto = Configuration::get($this->name.'tax_class');
+       
+       
+       if(!$cnpj_fabricante){
+         $cnpj_fabricante = Configuration::get($this->name.'cnpj_fabricante');
+       }
+       
+       if(!$ind_escala){
+         $ind_escala = Configuration::get($this->name.'ind_escala');
+       }
+       
 
 
         $subtotal = number_format($item['unit_price_tax_incl'], 2, '.', '');
@@ -1886,9 +2067,12 @@ class WebmaniaBrNFe extends Module{
        $data['produtos'][] = array(
          'nome' => $item['product_name'], // Nome do produto
          'sku' => $item['product_reference'], // Código identificador - SKU
-         'ean' => $codigo_ean, // Código EAN
+         'gtin' => $gtin, // Código GTIN, antigo EAN,
+         'gtin_tributavel' => $gtin_tributavel,
          'ncm' => $codigo_ncm, // Código NCM
          'cest' => $codigo_cest, // Código CEST
+         'cnpj_fabricante' => $cnpj_fabricante,
+         'ind_escala' => $ind_escala,
          'quantidade' => $item['product_quantity'], // Quantidade de itens
          'unidade' => 'UN', // Unidade de medida da quantidade de itens
          'peso' => $peso, // Peso em KG. Ex: 800 gramas = 0.800 KG
@@ -1903,44 +2087,55 @@ class WebmaniaBrNFe extends Module{
 
      if($include_shipping_info == 'on'){
 
-       $method = Configuration::get($this->name.'transp_method');
+       $carriers = Configuration::get($this->name.'carriers');
+       $carriers = base64_decode(str_replace('%', '=', $carriers));
+       $carriers = json_decode($carriers, true);
+       
+       if(!is_array($carriers)) $carriers = array();
+       
+       foreach($carriers as $carrier){
+         
+         if($carrier['method'] == $order->id_carrier){
+           
+           $data['transporte'] = array(
+             'cnpj'         => $carrier['cnpj'],
+             'razao_social' => $carrier['razao_social'],
+             'ie'           => $carrier['ie'],
+             'endereco'     => $carrier['address'],
+             'uf'           => $carrier['uf'],
+             'cidade'       => $carrier['city'],
+             'cep'          => $carrier['cep'],
+           );
+           
+           
+           $transporte_info = Db::getInstance()->getRow("SELECT nfe_modalidade_frete, nfe_volumes, nfe_especie, nfe_peso_bruto, nfe_peso_liquido FROM "._DB_PREFIX_."orders WHERE id_order = $orderID");
 
-       if($method == $order->id_carrier){
-
-         $data['transporte'] = array(
-           'cnpj'         => Configuration::get($this->name.'transp_cnpj'),
-           'razao_social' => Configuration::get($this->name.'transp_rs'),
-           'ie'           => Configuration::get($this->name.'transp_ie'),
-           'endereco'     => Configuration::get($this->name.'transp_address'),
-           'uf'           => Configuration::get($this->name.'transp_uf'),
-           'cidade'       => Configuration::get($this->name.'transp_city'),
-           'cep'          => Configuration::get($this->name.'transp_cep'),
-         );
-
-         $transporte_info = Db::getInstance()->getRow("SELECT nfe_modalidade_frete, nfe_volumes, nfe_especie, nfe_peso_bruto, nfe_peso_liquido FROM "._DB_PREFIX_."orders WHERE id_order = $orderID");
-
-         $transporte_keys = array(
-           'nfe_volumes'      => 'volume',
-           'nfe_especie'      => 'especie',
-           'nfe_peso_bruto'   => 'peso_bruto',
-           'nfe_peso_liquido' => 'peso_liquido'
-         );
-
-         foreach($transporte_keys as $db_key => $api_key){
-           if($transporte_info[$db_key]){
-             $data['transporte'][$api_key] = $transporte_info[$db_key];
+           $transporte_keys = array(
+             'nfe_volumes'      => 'volume',
+             'nfe_especie'      => 'especie',
+             'nfe_peso_bruto'   => 'peso_bruto',
+             'nfe_peso_liquido' => 'peso_liquido'
+           );
+  
+           foreach($transporte_keys as $db_key => $api_key){
+             if($transporte_info[$db_key]){
+               $data['transporte'][$api_key] = $transporte_info[$db_key];
+             }
            }
+  
+           if($transporte_info['nfe_modalidade_frete']){
+             $data['pedido']['modalidade_frete'] = $transporte_info['nfe_modalidade_frete'];
+           }
+           
          }
-
-         if($transporte_info['nfe_modalidade_frete']){
-           $data['pedido']['modalidade_frete'] = $transporte_info['nfe_modalidade_frete'];
-         }
-
+         
        }
-
+       
     }
 
+
     return $data;
+    
   }
 
   function get_category_ncm( $id_category ){
@@ -2006,12 +2201,75 @@ class WebmaniaBrNFe extends Module{
     return $keys;
   }
 
+  public function get_tables_select_element($name){
+    
+    $name = 'webmaniabrnfedocstable_'.$name;
+    $active_value = Configuration::get($name);
+    
+    
+    $tables = Db::getInstance()->executeS("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'");
+    $html = '<select name="'.$name.'" class="nfe-docs--column" id="'.$name.'">';
+    $html .= '<option value="">Selecionar</option>';
+    
+    foreach($tables as $table){
+      
+      $selected = '';
+      if($table['TABLE_NAME'] == $active_value){
+        $selected = 'selected';
+      }
+      
+      $html.= '<option value="'.$table['TABLE_NAME'].'" '.$selected.'>'.$table['TABLE_NAME'].'</option>';
+    }
+    
+    $html .= '</select>';
+    return $html;
+    
+  }
+  
+  public function get_columns_select_element($name){
+    
+    
+    $active_table = Configuration::get($this->name.'docstable_'.$name);
+    
+    $name = 'webmaniabrnfedocscolumn_'.$name;
+    $active_value = Configuration::get($name);
+    
+    if($active_table){
+      $results = Db::getInstance()->executeS("SELECT column_name from information_schema.columns where table_name = '$active_table'");  
+      
+      $html = '<select name="'.$name.'">';
+      $html .= '<option value="">Selecionar</option>';
+      
+      foreach($results as $column){
+        
+        $selected = '';
+        if($column['column_name'] == $active_value){
+          $selected = 'selected';
+        }
+        
+        $html .= '<option value="'.$column['column_name'].'" '.$selected.'>'.$column['column_name'].'</option>';
+        
+      }
+      
+      $html .= '</select>';
+      
+      
+    }else{
+      $html = '<select name="'.$name.'"><option value=""></option></select>';
+    }
+    
+    
+    return $html;
+    
+  }
+  
   public function emitirNfe($orderID){
 
     $webmaniabr = new NFe($this->settings);
     $data = $this->getOrderData($orderID);
   
     $response = $webmaniabr->emissaoNotaFiscal( $data );
+    
 
     if (isset($response->error) || $response->status == 'reprovado'){
 
@@ -2027,6 +2285,7 @@ class WebmaniaBrNFe extends Module{
     }else{
 
       $nfe_info = array(
+      'uuid'         => (string) $response->uuid,
       'status'       => (string) $response->status,
       'chave_acesso' => $response->chave,
       'n_recibo'     => (int) $response->recibo,
@@ -2099,8 +2358,8 @@ class WebmaniaBrNFe extends Module{
   }
 
   public function processBulkEmitirNfe(){
-
-    if( Tools::isSubmit('submitBulkemitirNfeorder') ){
+  
+    if( Tools::isSubmit('submitBulkemitirNfeorder')  ){
       $values = Tools::getValue('orderBox');
       foreach($values as $orderID){
         $this->emitirNfe($orderID);
@@ -2193,10 +2452,17 @@ class WebmaniaBrNFe extends Module{
             'name' => 'nfe_tax_class',
             'sql' => ' ADD COLUMN nfe_tax_class VARCHAR(20)'
           ),
+          
           'nfe_ean_bar_code' => array(
             'name' => 'nfe_ean_bar_code',
             'sql' => ' ADD COLUMN nfe_ean_bar_code VARCHAR(20)'
           ),
+          
+          'nfe_gtin_tributavel' => array(
+            'name' => 'nfe_gtin_tributavel',
+            'sql' => ' ADD COLUMN nfe_gtin_tributavel VARCHAR(20)'
+          ),
+          
           'nfe_ncm_code' => array(
             'name' => 'nfe_ncm_code',
             'sql' => ' ADD COLUMN nfe_ncm_code VARCHAR(20)'
@@ -2204,6 +2470,14 @@ class WebmaniaBrNFe extends Module{
           'nfe_cest_code' => array(
             'name' => 'nfe_cest_code',
             'sql' => ' ADD COLUMN nfe_cest_code VARCHAR(20)'
+          ),
+          'nfe_cnpj_fabricante' => array(
+            'name' => 'nfe_cnpj_fabricante',
+            'sql'  => ' ADD COLUMN nfe_cnpj_fabricante VARCHAR(20)'
+          ),
+          'nfe_ind_escala' => array(
+            'name' => 'nfe_ind_escala',
+            'sql'  => ' ADD COLUMN nfe_ind_escala VARCHAR(5)',
           ),
           'nfe_product_source' => array(
             'name' => 'nfe_product_source',
@@ -2282,7 +2556,7 @@ class WebmaniaBrNFe extends Module{
 
   public function getProductNfeValues($productID){
 
-    $result = Db::getInstance()->ExecuteS('SELECT nfe_tax_class, nfe_ean_bar_code, nfe_ncm_code, nfe_cest_code, nfe_product_source, nfe_ignorar_nfe FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$productID);
+    $result = Db::getInstance()->ExecuteS('SELECT nfe_tax_class, nfe_ean_bar_code, nfe_gtin_tributavel, nfe_ncm_code, nfe_cest_code, nfe_product_source, nfe_ind_escala, nfe_cnpj_fabricante, nfe_ignorar_nfe FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$productID);
     return $result;
 
   }
@@ -2740,12 +3014,13 @@ class WebmaniaBrNFe extends Module{
 
         foreach($order_nfe_info as $key => $nfe){
 
-          $numero_nfe = $nfe['n_nfe'];
+          $uuid       = $nfe['uuid'];
 
           $current_status = $nfe['status'];
           $received_status = $_POST['status'];
+          
 
-          if($numero_nfe == $_POST['nfe'] && $current_status != $received_status){
+          if($uuid == $_POST['uuid'] && $current_status != $received_status){
 
             $order_nfe_info[$key]['status'] = $received_status;
             $nfe_info_str = serialize($order_nfe_info);
