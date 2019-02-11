@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.7.0';
+    $this->version = '2.7.1';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -125,10 +125,11 @@ class WebmaniaBrNFe extends Module{
     if(Tools::isSubmit('submit'.$this->name)){
       $fields = $this->getConfigInitValues();
       foreach($fields as $key => $value){
-        
+
         $input_value = strval(Tools::getValue($key));
+
         if($input_value){
-            
+
           if(Validate::isGenericName($input_value)){
             Configuration::updateValue($key, $input_value);
           }elseif($key == 'webmaniabrnfecarriers'){
@@ -169,14 +170,14 @@ class WebmaniaBrNFe extends Module{
     return $options;
 
   }
-  
+
   public function get_payment_methods_options() {
 
     $options = array();
 
     $default_language = (int)Configuration::get('PS_LANG_DEFAULT');
     $methods = PaymentModule::getInstalledPaymentModules();
-    
+
     foreach($methods as $payment_method){
       $options[] = array(
         'value' => $payment_method['name'],
@@ -189,16 +190,16 @@ class WebmaniaBrNFe extends Module{
   }
 
   public function displayForm(){
-    
+
     ob_start();
-    
+
     require_once('views/templates/settings-page.php');
     $html = ob_get_clean();
-    
+
     return $html;
-    
-    
-    
+
+
+
     $default_language = (int)Configuration::get('PS_LANG_DEFAULT');
 
     $select_options = array(
@@ -738,7 +739,7 @@ class WebmaniaBrNFe extends Module{
       $this->name.'transp_city'    => Configuration::get($this->name.'transp_city'),
       $this->name.'transp_uf'      => Configuration::get($this->name.'transp_uf'),
       $this->name.'carriers'       => Configuration::get($this->name.'carriers'),
-      
+
       $this->name.'docscolumn_cpf'   => Configuration::get($this->name.'docscolumn_cpf'),
       $this->name.'docscolumn_cnpj'  => Configuration::get($this->name.'docscolumn_cnpj'),
       $this->name.'docscolumn_rs'    => Configuration::get($this->name.'docscolumn_rs'),
@@ -748,9 +749,9 @@ class WebmaniaBrNFe extends Module{
       $this->name.'docstable_rs'     => Configuration::get($this->name.'docstable_rs'),
       $this->name.'docstable_ie'     => Configuration::get($this->name.'docstable_ie'),
     );
-    
-    
-    
+
+
+
 
   }
 
@@ -811,14 +812,14 @@ class WebmaniaBrNFe extends Module{
       $this->name.'docstable_cnpj'   => '',
       $this->name.'docstable_rs'     => '',
       $this->name.'docstable_ie'     => ''
-      
+
     );
-    
+
     $payment_methods = $this->get_payment_methods_options();
     foreach($payment_methods as $method){
       $arr[$this->name.'payment_'.$method['value']] = '';
     }
-    
+
     return $arr;
 
   }
@@ -920,29 +921,29 @@ class WebmaniaBrNFe extends Module{
     }
 
   }
-  
+
   public function hookDisplayAdminOrderTabShip($order, $products, $customer){
-    
+
     $include_shipping_info = Configuration::get($this->name.'transp_include');
     if($include_shipping_info != 'on') return false;
-    
+
     return '<li><a href="#nfe-shipping-info">Transporte (NF-e)</a></li>';
-    
+
   }
-  
-  
+
+
   public function hookDisplayAdminOrderContentShip($order, $products, $customer){
-    
+
     $include_shipping_info = Configuration::get($this->name.'transp_include');
     if($include_shipping_info != 'on') return false;
-    
+
     ob_start();
     require_once('views/templates/order_nfe_shipping_info.php');
-    
+
     $html = ob_get_clean();
-    
+
     return $html;
-    
+
   }
 
 
@@ -1028,7 +1029,7 @@ class WebmaniaBrNFe extends Module{
       'nfe_peso_bruto' => pSQL(Tools::getValue('nfe_peso_bruto')),
       'nfe_peso_liquido' => pSQL(Tools::getValue('nfe_peso_liquido')),
     ),'id_order = ' .$order_id )){
-      $this->context->controller->_errors[] = Tools::displayError('Error: ').mysql_error();
+      $this->context->controller->_errors[] = 'Error: '.mysql_error();
     }
 
   }
@@ -1183,7 +1184,7 @@ class WebmaniaBrNFe extends Module{
       'nfe_product_source' => pSQL(Tools::getValue('nfe_product_source')),
       'nfe_ignorar_nfe' => pSQL(Tools::getValue('nfe_ignorar_nfe'))
     ),'id_product = ' .$id_product )){
-      $this->context->controller->_errors[] = Tools::displayError('Error: ').mysql_error();
+      $this->context->controller->_errors[] = 'Error: '.mysql_error();
     }
 
   }
@@ -1208,7 +1209,7 @@ class WebmaniaBrNFe extends Module{
     }
 
     if(!Db::getInstance()->update('customer', $DB_data, 'id_customer = ' .$customer_id )){
-      $this->context->controller->_errors[] = Tools::displayError('Error: ').mysql_error();
+      $this->context->controller->_errors[] = 'Error: '.mysql_error();
     }
 
   }
@@ -1542,7 +1543,7 @@ class WebmaniaBrNFe extends Module{
   }
 
   public function updateAddressInfo( $address_id ){
- 
+
     $number_status = Configuration::get($this->name.'numero_compl_status');
     $update_values = array();
     $context_type = Context::getContext()->controller->controller_type;
@@ -1552,7 +1553,7 @@ class WebmaniaBrNFe extends Module{
     }else{
       $number = Tools::getValue(Configuration::get($this->name.'numero_field'));
     }
-  
+
     $update_values = array(
       'address_number'=> pSQL($number),
     );
@@ -1594,14 +1595,14 @@ class WebmaniaBrNFe extends Module{
     $this->updateAddressInfo($address_id);
 
   }
-  
+
   public function hookActionObjectUpdateAfter( $params ){
-    
+
     if( is_a($params['object'], 'Address')){
       $address_id = $params['object']->id;
       $this->updateAddressInfo($address_id);
     }
-    
+
   }
 
 
@@ -1627,35 +1628,35 @@ class WebmaniaBrNFe extends Module{
         'ie'           => Configuration::get($this->name.'cnpj_ie_field'),
       );
     }
-    
+
     // Set user
     $is_cnpj = str_replace( array('/', '.', '-'), '', Tools::getValue($fields['cnpj']));
     if ($is_cnpj && strlen($is_cnpj) == 14) $is_cnpj = true; else $is_cnpj = false;
-    
+
     if ($is_cnpj){
-      
+
       if (Tools::getValue($fields['cnpj'])){
-        
+
         $update_values['nfe_document_type'] = 'cnpj';
         $update_values['nfe_document_number'] = preg_replace("/[^0-9]/","", Tools::getValue($fields['cnpj']));
-        
+
         if (Tools::getValue($fields['razao_social'])) $update_values['nfe_razao_social'] = pSQL(Tools::getValue($fields['razao_social']));
         else $update_values['nfe_razao_social'] = '';
-        
+
         if (Tools::getValue($fields['ie'])) $update_values['nfe_pj_ie'] = pSQL(Tools::getValue($fields['ie']));
         else $update_values['nfe_pj_ie'] = '';
-          
+
       }
 
     } else {
-   
+
       if (Tools::getValue($fields['cpf'])){
-        
+
         $update_values['nfe_document_type'] = 'cpf';
         $update_values['nfe_document_number'] = preg_replace("/[^0-9]/","", Tools::getValue($fields['cpf']));
         $update_values['nfe_razao_social'] = '';
         $update_values['nfe_pj_ie'] = '';
-        
+
       }
 
     }
@@ -1759,7 +1760,7 @@ class WebmaniaBrNFe extends Module{
   public function getOrderData($orderID){
 
     $order = new Order($orderID);
-    
+
     $discounts = $order->getDiscounts(true);
     $discounts_applied = array(); // Only percentage
 
@@ -1779,57 +1780,57 @@ class WebmaniaBrNFe extends Module{
         $discounts_applied[] = $cart_rule->reduction_percent;
       }
     }
-    
+
     // Get customer
     $customer = $order->getCustomer();
     $customer_docs = array();
-    
+
     // Get Custom Fields
     $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
     $number_status = Configuration::get($this->name.'numero_compl_status');
     $bairro_status = Configuration::get($this->name.'bairro_status');
 
     if ($cpf_cnpj_status == 'on'){
-      
+
       $result = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
-      
+
       $customer_docs = array(
         'cpf'          => $result['nfe_document_number'],
         'cnpj'         => $result['nfe_document_number'],
         'razao_social' => $result['nfe_razao_social'],
         'ie'           => $result['nfe_pj_ie']
       );
-      
+
     } else {
-      
+
       $customer_docs = array();
-      
+
       if(!Configuration::get($this->name.'docscolumn_cpf')){
-        
+
         $fields = array(
           'cpf'            => Configuration::get($this->name.'cpf_field'),
           'cnpj'           => Configuration::get($this->name.'cnpj_field'),
           'razao_social'   => Configuration::get($this->name.'razao_social_field'),
           'ie'             => Configuration::get($this->name.'cnpj_ie_field')
         );
-        
+
         $address = new Address($order->id_address_delivery);
         $customer_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
         $address_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
-        
+
         if(isset($customer_custom[$fields['cpf']])) $customer_docs['cpf'] = $customer_custom[$fields['cpf']];
         if(isset($customer_custom[$fields['cnpj']])) $customer_docs['cnpj'] = $customer_custom[$fields['cnpj']];
         if(isset($customer_custom[$fields['razao_social']])) $customer_docs['razao_social'] = $customer_custom[$fields['razao_social']];
         if(isset($customer_custom[$fields['ie']])) $customer_docs['ie'] = $customer_custom[$fields['ie']];
-        
+
         // Identify if customer custom fields is located in _address database
-        if (isset($address_custom[$fields['cpf']])) $customer_docs['cpf'] = $address_custom[$fields['cpf']]; 
-        if (isset($address_custom[$fields['cnpj']])) $customer_docs['cnpj'] = $address_custom[$fields['cnpj']]; 
+        if (isset($address_custom[$fields['cpf']])) $customer_docs['cpf'] = $address_custom[$fields['cpf']];
+        if (isset($address_custom[$fields['cnpj']])) $customer_docs['cnpj'] = $address_custom[$fields['cnpj']];
         if (isset($address_custom[$fields['razao_social']])) $customer_docs['razao_social'] = $address_custom[$fields['razao_social']];
         if (isset($address_custom[$fields['ie']])) $customer_docs['ie'] = $address_custom[$fields['ie']];
-        
+
       }else{
-        
+
         $map = array(
           'cpf' => array(
             'table'  => Configuration::get($this->name.'docstable_cpf'),
@@ -1848,41 +1849,41 @@ class WebmaniaBrNFe extends Module{
             'column' => Configuration::get($this->name.'docscolumn_ie')
           )
         );
-        
+
         foreach($map as $key => $doc){
-          
+
           $table  = $doc['table'];
           $column = $doc['column'];
           $query = "SELECT $column FROM $table WHERE id_customer = '$customer->id'";
-          
+
           $val = Db::getInstance()->getValue($query);
           $customer_docs[$key] = $val;
-          
+
         }
-        
+
       }
-      
+
     }
-    
+
 
     if ($number_status == 'on') $fields['address_number'] = 'address_number';
     else $fields['address_number'] = Configuration::get($this->name.'numero_field');
-    
+
     if ($bairro_status == 'on') $fields['bairro'] = 'bairro';
     else $fields['bairro'] = Configuration::get($this->name.'bairro_field');
-    
+
     // Search Database
     $address = new Address($order->id_address_delivery);
     $state = new State($address->id_state);
     $products = $order->getProducts();
-    
+
     $address_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
-    
+
     // Set Document Type
     /*$is_cnpj = str_replace( array('/', '.', '-'), '', $customer_custom[$fields['cnpj']]);
     if ($is_cnpj && strlen($is_cnpj) == 14) $is_cnpj = true; else $is_cnpj = false;
     if ($is_cnpj) $tipo_pessoa = 'cnpj'; else $tipo_pessoa = 'cpf';*/
-    
+
     // Array start
     $data = array(
         'ID' => $order->id, // Número do pedido
@@ -1902,11 +1903,11 @@ class WebmaniaBrNFe extends Module{
          'desconto' => number_format($order->total_discounts_tax_incl, 2, '.', ''), // Total do desconto
          'total' => number_format($order->total_paid_tax_incl, 2, '.', ''),  // Total do pedido - sem descontos
      );
-     
-     
+
+
      $payment_module = $order->module;
      $payment_method = Configuration::get('webmaniabrnfepayment_'.$payment_module);
-     
+
      if($payment_method){
        $data['pedido']['forma_pagamento'] = $payment_method;
      }
@@ -1927,20 +1928,20 @@ class WebmaniaBrNFe extends Module{
 
 
       $tipo_pessoa = 'cpf';
-      
+
       if($customer_docs['cnpj'] && $customer_docs['cnpj'] != $customer_docs['cpf']){
         $tipo_pessoa = 'cnpj';
       }else if( $this->is_cnpj($customer_docs['cpf']) ){
         $tipo_pessoa = 'cnpj';
       }
-        
-      
+
+
      //Client
      if($tipo_pessoa == 'cnpj'){
 
        $cnpj = $this->cnpj($customer_docs['cnpj']);
        if( !$cnpj && isset($customer->cnpj) ) $cnpj = $customer->cnpj;
-       
+
        if (!$customer_custom[$fields['razao_social']]) $razao_social = $customer->firstname.' '.$customer->lastname;
        else $razao_social = $customer_custom[$fields['razao_social']];
 
@@ -1958,7 +1959,7 @@ class WebmaniaBrNFe extends Module{
          'telefone'     => $address->phone, // Telefone do cliente
          'email'        => $customer->email // E-mail do cliente para envio da NF-e
        );
-       
+
      }else{
 
        $cpf = $this->cpf($customer_docs['cpf']);
@@ -2012,16 +2013,16 @@ class WebmaniaBrNFe extends Module{
        */
        //Antigo EAN
        $gtin = Db::getInstance()->getValue('SELECT nfe_ean_bar_code FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
-       
+
        $gtin_tributavel = Db::getInstance()->getValue('SELECT nfe_gtin_tributavel FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
-       
+
        $codigo_ncm = Db::getInstance()->getValue('SELECT nfe_ncm_code FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
        $codigo_cest = Db::getInstance()->getValue('SELECT nfe_cest_code FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
-       
+
        $cnpj_fabricante = Db::getInstance()->getValue('SELECT nfe_cnpj_fabricante FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
-       
+
        $ind_escala = Db::getInstance()->getValue('SELECT nfe_ind_escala FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
-       
+
        $origem = Db::getInstance()->getValue('SELECT nfe_product_source FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
        $imposto = Db::getInstance()->getValue('SELECT nfe_tax_class FROM '._DB_PREFIX_.'product WHERE id_product = ' . (int)$product_id);
        $peso = $item['product_weight'];
@@ -2049,16 +2050,16 @@ class WebmaniaBrNFe extends Module{
        if (!$codigo_cest) $codigo_cest = Configuration::get($this->name.'cest_code');
        if (!is_numeric($origem) || $origem == -1) $origem = Configuration::get($this->name.'product_source');
        if (!$imposto) $imposto = Configuration::get($this->name.'tax_class');
-       
-       
+
+
        if(!$cnpj_fabricante){
          $cnpj_fabricante = Configuration::get($this->name.'cnpj_fabricante');
        }
-       
+
        if(!$ind_escala){
          $ind_escala = Configuration::get($this->name.'ind_escala');
        }
-       
+
 
 
         $subtotal = number_format($item['unit_price_tax_incl'], 2, '.', '');
@@ -2090,13 +2091,13 @@ class WebmaniaBrNFe extends Module{
        $carriers = Configuration::get($this->name.'carriers');
        $carriers = base64_decode(str_replace('%', '=', $carriers));
        $carriers = json_decode($carriers, true);
-       
+
        if(!is_array($carriers)) $carriers = array();
-       
+
        foreach($carriers as $carrier){
-         
+
          if($carrier['method'] == $order->id_carrier){
-           
+
            $data['transporte'] = array(
              'cnpj'         => $carrier['cnpj'],
              'razao_social' => $carrier['razao_social'],
@@ -2106,8 +2107,8 @@ class WebmaniaBrNFe extends Module{
              'cidade'       => $carrier['city'],
              'cep'          => $carrier['cep'],
            );
-           
-           
+
+
            $transporte_info = Db::getInstance()->getRow("SELECT nfe_modalidade_frete, nfe_volumes, nfe_especie, nfe_peso_bruto, nfe_peso_liquido FROM "._DB_PREFIX_."orders WHERE id_order = $orderID");
 
            $transporte_keys = array(
@@ -2116,26 +2117,26 @@ class WebmaniaBrNFe extends Module{
              'nfe_peso_bruto'   => 'peso_bruto',
              'nfe_peso_liquido' => 'peso_liquido'
            );
-  
+
            foreach($transporte_keys as $db_key => $api_key){
              if($transporte_info[$db_key]){
                $data['transporte'][$api_key] = $transporte_info[$db_key];
              }
            }
-  
+
            if($transporte_info['nfe_modalidade_frete']){
              $data['pedido']['modalidade_frete'] = $transporte_info['nfe_modalidade_frete'];
            }
-           
+
          }
-         
+
        }
-       
+
     }
 
 
     return $data;
-    
+
   }
 
   function get_category_ncm( $id_category ){
@@ -2202,83 +2203,83 @@ class WebmaniaBrNFe extends Module{
   }
 
   public function get_tables_select_element($name){
-    
+
     $name = 'webmaniabrnfedocstable_'.$name;
     $active_value = Configuration::get($name);
-    
-    
+
+
     $tables = Db::getInstance()->executeS("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'");
     $html = '<select name="'.$name.'" class="nfe-docs--column" id="'.$name.'">';
     $html .= '<option value="">Selecionar</option>';
-    
+
     foreach($tables as $table){
-      
+
       $selected = '';
       if($table['TABLE_NAME'] == $active_value){
         $selected = 'selected';
       }
-      
+
       $html.= '<option value="'.$table['TABLE_NAME'].'" '.$selected.'>'.$table['TABLE_NAME'].'</option>';
     }
-    
+
     $html .= '</select>';
     return $html;
-    
+
   }
-  
+
   public function get_columns_select_element($name){
-    
-    
+
+
     $active_table = Configuration::get($this->name.'docstable_'.$name);
-    
+
     $name = 'webmaniabrnfedocscolumn_'.$name;
     $active_value = Configuration::get($name);
-    
+
     if($active_table){
-      $results = Db::getInstance()->executeS("SELECT column_name from information_schema.columns where table_name = '$active_table'");  
-      
+      $results = Db::getInstance()->executeS("SELECT column_name from information_schema.columns where table_name = '$active_table'");
+
       $html = '<select name="'.$name.'">';
       $html .= '<option value="">Selecionar</option>';
-      
+
       foreach($results as $column){
-        
+
         $selected = '';
         if($column['column_name'] == $active_value){
           $selected = 'selected';
         }
-        
+
         $html .= '<option value="'.$column['column_name'].'" '.$selected.'>'.$column['column_name'].'</option>';
-        
+
       }
-      
+
       $html .= '</select>';
-      
-      
+
+
     }else{
       $html = '<select name="'.$name.'"><option value=""></option></select>';
     }
-    
-    
+
+
     return $html;
-    
+
   }
-  
+
   public function emitirNfe($orderID){
 
     $webmaniabr = new NFe($this->settings);
     $data = $this->getOrderData($orderID);
-  
+
     $response = $webmaniabr->emissaoNotaFiscal( $data );
-    
+
 
     if (isset($response->error) || $response->status == 'reprovado'){
 
       if(isset($response->error)){
-        $this->context->controller->errors[] = Tools::displayError('Erro ao emitir a NF-e do Pedido #'.$orderID.' ( '.$response->error.' )');
+        $this->context->controller->errors[] = 'Erro ao emitir a NF-e do Pedido #'.$orderID.' ( '.$response->error.' )';
         }elseif(isset($response->log->aProt[0]->xMotivo)){
-          $this->context->controller->errors[] = Tools::displayError('Erro ao emitir a NF-e do Pedido #'.$orderID. '( '.$response->log->aProt[0]->xMotivo.' )');
+          $this->context->controller->errors[] = 'Erro ao emitir a NF-e do Pedido #'.$orderID. '( '.$response->log->aProt[0]->xMotivo.' )';
         }else{
-          $this->context->controller->errors[] = Tools::displayError('Erro ao emitir a NF-e do Pedido #'.$orderID);
+          $this->context->controller->errors[] = 'Erro ao emitir a NF-e do Pedido #'.$orderID;
         }
 
 
@@ -2306,15 +2307,15 @@ class WebmaniaBrNFe extends Module{
       $nfe_info_str = serialize($existing_nfe_info);
 
       if(!Db::getInstance()->update('orders', array('nfe_info' => $nfe_info_str), 'id_order = ' .$orderID )){
-        $this->context->controller->errors[] = Tools::displayError('Erro ao atualizar status da NF-e');
+        $this->context->controller->errors[] = 'Erro ao atualizar status da NF-e';
       }
 
       if(!Db::getInstance()->update('orders', array('nfe_issued' => 1), 'id_order = ' .$orderID )){
-        $this->context->controller->errors[] = Tools::displayError('Erro ao alterar status da NF-e #'.$orderID);
+        $this->context->controller->errors[] = 'Erro ao alterar status da NF-e #'.$orderID;
       }
 
 
-        $this->context->controller->confirmations[] = Tools::displayError('NF-e emitida com sucesso do Pedido #'.$orderID);
+        $this->context->controller->confirmations[] = 'NF-e emitida com sucesso do Pedido #'.$orderID;
 
     }
 
@@ -2331,7 +2332,7 @@ class WebmaniaBrNFe extends Module{
 
       if (isset($response->error)){
 
-          $this->context->controller->errors[] = Tools::displayError('Erro: '.$response->error);
+          $this->context->controller->errors[] = 'Erro: '.$response->error;
           return false;
 
       }else{
@@ -2348,9 +2349,9 @@ class WebmaniaBrNFe extends Module{
         $nfe_data_str = serialize($nfe_data);
 
         if(!Db::getInstance()->update('orders', array('nfe_info' => $nfe_data_str),"id_order = '" .$order_id."'  " )){
-          $this->context->controller->errors[] = Tools::displayError('Erro ao atualizar informações da nota');
+          $this->context->controller->errors[] = 'Erro ao atualizar informações da Nota Fiscal';
         }else{
-          $this->context->controller->confirmations[] = Tools::displayError('NF-e atualizada com sucesso');
+          $this->context->controller->confirmations[] = 'NF-e atualizada com sucesso';
         }
 
       }
@@ -2358,7 +2359,7 @@ class WebmaniaBrNFe extends Module{
   }
 
   public function processBulkEmitirNfe(){
-  
+
     if( Tools::isSubmit('submitBulkemitirNfeorder')  ){
       $values = Tools::getValue('orderBox');
       foreach($values as $orderID){
@@ -2452,17 +2453,17 @@ class WebmaniaBrNFe extends Module{
             'name' => 'nfe_tax_class',
             'sql' => ' ADD COLUMN nfe_tax_class VARCHAR(20)'
           ),
-          
+
           'nfe_ean_bar_code' => array(
             'name' => 'nfe_ean_bar_code',
             'sql' => ' ADD COLUMN nfe_ean_bar_code VARCHAR(20)'
           ),
-          
+
           'nfe_gtin_tributavel' => array(
             'name' => 'nfe_gtin_tributavel',
             'sql' => ' ADD COLUMN nfe_gtin_tributavel VARCHAR(20)'
           ),
-          
+
           'nfe_ncm_code' => array(
             'name' => 'nfe_ncm_code',
             'sql' => ' ADD COLUMN nfe_ncm_code VARCHAR(20)'
@@ -2681,12 +2682,11 @@ class WebmaniaBrNFe extends Module{
 
     if($validade < 45 && $validade >= 1){
 
-        $this->context->controller->warnings[] = Tools::displayError('WebmaniaBR NF-e: Emita um novo Certificado Digital A1 - vencerá em '.$this->getValidadeCertificado().' dias');
-
+        $this->context->controller->warnings[] = 'WebmaniaBR NF-e: Emita um novo Certificado Digital A1 - vencerá em '.$this->getValidadeCertificado().' dias';
 
     }else if(!$validade){
 
-        $this->context->controller->errors[] = Tools::displayError('WebmaniaBR NF-e: Certificado Digital A1 vencido. Emita um novo para continuar operando.');
+        $this->context->controller->errors[] = 'WebmaniaBR NF-e: Certificado Digital A1 vencido. Emita um novo para continuar operando.';
 
     }
 
@@ -3018,7 +3018,7 @@ class WebmaniaBrNFe extends Module{
 
           $current_status = $nfe['status'];
           $received_status = $_POST['status'];
-          
+
 
           if($uuid == $_POST['uuid'] && $current_status != $received_status){
 
@@ -3026,7 +3026,7 @@ class WebmaniaBrNFe extends Module{
             $nfe_info_str = serialize($order_nfe_info);
 
             if(!Db::getInstance()->update('orders', array('nfe_info' => $nfe_info_str), 'id_order = ' .$order_id )){
-              $this->context->controller->errors[] = Tools::displayError('Erro ao atualizar status da NF-e');
+              $this->context->controller->errors[] = 'Erro ao atualizar status da NF-e';
             }
             break;
           }
