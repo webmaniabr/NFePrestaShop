@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.7.1';
+    $this->version = '2.7.5';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -689,6 +689,7 @@ class WebmaniaBrNFe extends Module{
     );
 
     $helper->fields_value = $this->getConfigFieldsValues();
+
     return $helper->generateForm($fields_form).'<span class="teste"></span>';
   }
 
@@ -904,6 +905,11 @@ class WebmaniaBrNFe extends Module{
   public function hookDisplayBackOfficeHeader($params){
 
     $this->hookBackOfficeHeader($params);
+
+    if(!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest'){
+      return;
+    }
+
     $this->displayMessageCertificado();
 
   }
@@ -1730,6 +1736,7 @@ class WebmaniaBrNFe extends Module{
   }
 
   public function checkAuthentication(){
+
     foreach($this->settings as $setting){
       if(empty($setting)){
         $url  = 'index.php?controller=AdminModules&configure=webmaniabrnfe';
@@ -1831,37 +1838,44 @@ class WebmaniaBrNFe extends Module{
 
       }else{
 
-        $map = array(
-          'cpf' => array(
-            'table'  => Configuration::get($this->name.'docstable_cpf'),
-            'column' => Configuration::get($this->name.'docscolumn_cpf')
-          ),
-          'cnpj' => array(
-            'table'  => Configuration::get($this->name.'docstable_cnpj'),
-            'column' => Configuration::get($this->name.'docscolumn_cnpj')
-          ),
-          'razao_social' => array(
-            'table'  => Configuration::get($this->name.'docstable_rs'),
-            'column' => Configuration::get($this->name.'docscolumn_rs'),
-          ),
-          'ie' => array(
-            'table'  => Configuration::get($this->name.'docstable_ie'),
-            'column' => Configuration::get($this->name.'docscolumn_ie')
-          )
-        );
+            $map = array(
+                'cpf' => array(
+                    'table'  => Configuration::get($this->name.'docstable_cpf'),
+                    'column' => Configuration::get($this->name.'docscolumn_cpf')
+                ),
+                'cnpj' => array(
+                    'table'  => Configuration::get($this->name.'docstable_cnpj'),
+                    'column' => Configuration::get($this->name.'docscolumn_cnpj')
+                ),
+                'razao_social' => array(
+                    'table'  => Configuration::get($this->name.'docstable_rs'),
+                    'column' => Configuration::get($this->name.'docscolumn_rs'),
+                ),
+                'ie' => array(
+                    'table'  => Configuration::get($this->name.'docstable_ie'),
+                    'column' => Configuration::get($this->name.'docscolumn_ie')
+                )
+            );
 
-        foreach($map as $key => $doc){
+            foreach($map as $key => $doc){
 
-          $table  = $doc['table'];
-          $column = $doc['column'];
-          $query = "SELECT $column FROM $table WHERE id_customer = '$customer->id'";
+                $table  = $doc['table'];
+                $column = $doc['column'];
 
-          $val = Db::getInstance()->getValue($query);
-          $customer_docs[$key] = $val;
+                if ($table != "" && $column != "" && $customer->id != ""){
+
+                    $query = "SELECT $column FROM $table WHERE id_customer = '$customer->id'";
+                    $val = Db::getInstance()->executeS($query);
+
+                    foreach ($val as $value) {
+                        $customer_docs[$key] = $value[$column];
+                    }
+
+                }
+
+            }
 
         }
-
-      }
 
     }
 
@@ -1876,6 +1890,7 @@ class WebmaniaBrNFe extends Module{
     $address = new Address($order->id_address_delivery);
     $state = new State($address->id_state);
     $products = $order->getProducts();
+
 
     $address_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
 
@@ -1926,15 +1941,17 @@ class WebmaniaBrNFe extends Module{
        $data['pedido']['informacoes_complementares'] = $consumidorinf;
      }
 
+    $tipo_pessoa = 'cpf';
 
-      $tipo_pessoa = 'cpf';
+    if ($customer_docs['cnpj'] && $customer_docs['cnpj'] != $customer_docs['cpf']){
 
-      if($customer_docs['cnpj'] && $customer_docs['cnpj'] != $customer_docs['cpf']){
         $tipo_pessoa = 'cnpj';
-      }else if( $this->is_cnpj($customer_docs['cpf']) ){
-        $tipo_pessoa = 'cnpj';
-      }
 
+    } else if ( $this->is_cnpj($customer_docs['cpf']) ){
+
+        $tipo_pessoa = 'cnpj';
+
+    }
 
      //Client
      if($tipo_pessoa == 'cnpj'){
@@ -1962,8 +1979,8 @@ class WebmaniaBrNFe extends Module{
 
      }else{
 
-       $cpf = $this->cpf($customer_docs['cpf']);
-       if( !$cpf && isset($customer->cpf) ) $cpf = $customer->cpf;
+        $cpf = $this->cpf($customer_docs['cpf']);
+        if( !$cpf && isset($customer->cpf) ) $cpf = $customer->cpf;
 
        $data['cliente'] = array(
          'cpf' => $cpf, // (pessoa fisica) Número do CPF
@@ -1980,9 +1997,21 @@ class WebmaniaBrNFe extends Module{
        );
      }
 
-     if(_MAIN_PS_VERSION_ == '1.7'){
+     if (_MAIN_PS_VERSION_ == '1.7'){
+
        $data['cliente']['bairro'] = $address_custom[$fields['bairro']];
-       $data['cliente']['complemento'] = $address->address2;
+
+       if (!$data['cliente']['bairro']) {
+
+         $data['cliente']['bairro'] = $address->address2;
+         $data['cliente']['complemento'] = $address->other;
+
+       } else {
+
+         $data['cliente']['complemento'] = $address->address2;
+
+       }
+
      }
 
      //produtos
@@ -2229,7 +2258,6 @@ class WebmaniaBrNFe extends Module{
 
   public function get_columns_select_element($name){
 
-
     $active_table = Configuration::get($this->name.'docstable_'.$name);
 
     $name = 'webmaniabrnfedocscolumn_'.$name;
@@ -2266,21 +2294,37 @@ class WebmaniaBrNFe extends Module{
 
   public function emitirNfe($orderID){
 
+    $isempty = false;
+
+    foreach($this->settings as $setting){
+      if(empty($setting)){
+        $url  = 'index.php?controller=AdminModules&configure=webmaniabrnfe';
+        $url .= '&token='.Tools::getAdminTokenLite('AdminModules');
+        $this->context->controller->errors[] = 'Informe as credenciais de acesso antes de emitir a NF-e: <a href="'.$url.'">Configurar</a>';
+        $isempty = true;
+        break;
+      }
+    }
+
+    if($isempty) return true;
+
     $webmaniabr = new NFe($this->settings);
     $data = $this->getOrderData($orderID);
 
     $response = $webmaniabr->emissaoNotaFiscal( $data );
 
 
-    if (isset($response->error) || $response->status == 'reprovado'){
+    if (!$response || isset($response->error) || $response->status == 'reprovado' ){
 
-      if(isset($response->error)){
+      if (!$response){
+        $this->context->controller->errors[] = 'Erro ao emitir a NF-e do Pedido #'.$orderID.' (null)';
+      } elseif (isset($response->error)){
         $this->context->controller->errors[] = 'Erro ao emitir a NF-e do Pedido #'.$orderID.' ( '.$response->error.' )';
-        }elseif(isset($response->log->aProt[0]->xMotivo)){
-          $this->context->controller->errors[] = 'Erro ao emitir a NF-e do Pedido #'.$orderID. '( '.$response->log->aProt[0]->xMotivo.' )';
-        }else{
-          $this->context->controller->errors[] = 'Erro ao emitir a NF-e do Pedido #'.$orderID;
-        }
+      } elseif (isset($response->log->aProt[0]->xMotivo)){
+        $this->context->controller->errors[] = 'Erro ao emitir a NF-e do Pedido #'.$orderID. '( '.$response->log->aProt[0]->xMotivo.' )';
+      } else {
+        $this->context->controller->errors[] = 'Erro ao emitir a NF-e do Pedido #'.$orderID;
+      }
 
 
     }else{
@@ -2324,6 +2368,7 @@ class WebmaniaBrNFe extends Module{
   }
 
   public function updateNFe(){
+
     if(Tools::getValue('atualizar') && Tools::getValue('chave')){
       $chave_acesso = pSql(Tools::getValue('chave'));
       $order_id = (int) Tools::getValue('id_order');
@@ -2590,24 +2635,64 @@ class WebmaniaBrNFe extends Module{
 
   function is_cnpj($cnpj = null) {
 
-      if(is_array($cnpj)) $cnpj = $cnpj[0];
-      $cnpj = sprintf( '%014s', preg_replace( '{\D}', '', $cnpj ) );
+    // Verifica se um número foi informado
+	if(empty($cnpj)) {
+		return false;
+	}
 
-      if ( 14 != ( strlen( $cnpj ) ) || ( 0 == intval( substr( $cnpj, -4 ) ) ) ) {
-        return false;
-      }
+	// Elimina possivel mascara
+	$cnpj = preg_replace("/[^0-9]/", "", $cnpj);
 
-      for ( $t = 11; $t < 13; ) {
-        for ( $d = 0, $p = 2, $c = $t; $c >= 0; $c--, ( $p < 9 ) ? $p++ : $p = 2 ) {
-          $d += $cnpj[ $c ] * $p;
-        }
+	// Verifica se o numero de digitos informados é igual a 11
+	if (strlen($cnpj) != 14) {
+		return false;
+	}
 
-        if ( $cnpj[ ++$t ] != ( $d = ( ( 10 * $d ) % 11 ) % 10 ) ) {
-          return false;
-        }
-      }
+	// Verifica se nenhuma das sequências invalidas abaixo
+	// foi digitada. Caso afirmativo, retorna falso
+	else if ($cnpj == '00000000000000' ||
+		$cnpj == '11111111111111' ||
+		$cnpj == '22222222222222' ||
+		$cnpj == '33333333333333' ||
+		$cnpj == '44444444444444' ||
+		$cnpj == '55555555555555' ||
+		$cnpj == '66666666666666' ||
+		$cnpj == '77777777777777' ||
+		$cnpj == '88888888888888' ||
+		$cnpj == '99999999999999') {
+		return false;
 
-      return true;
+	 // Calcula os digitos verificadores para verificar se o
+	 // CPF é válido
+    } else {
+
+		$j = 5;
+		$k = 6;
+		$soma1 = "";
+		$soma2 = "";
+
+		for ($i = 0; $i < 13; $i++) {
+
+			$j = $j == 1 ? 9 : $j;
+			$k = $k == 1 ? 9 : $k;
+
+			$soma2 += ($cnpj{$i} * $k);
+
+			if ($i < 12) {
+				$soma1 += ($cnpj{$i} * $j);
+			}
+
+			$k--;
+			$j--;
+
+		}
+
+		$digito1 = $soma1 % 11 < 2 ? 0 : 11 - $soma1 % 11;
+		$digito2 = $soma2 % 11 < 2 ? 0 : 11 - $soma2 % 11;
+
+		return (($cnpj{12} == $digito1) and ($cnpj{13} == $digito2));
+
+    }
   }
 
   function cpf( $string ){
@@ -2675,6 +2760,7 @@ class WebmaniaBrNFe extends Module{
 
   public function displayMessageCertificado(){
 
+
     $validade = $this->getValidadeCertificado();
     if(isset($validade->error)){
       return false;
@@ -2686,7 +2772,7 @@ class WebmaniaBrNFe extends Module{
 
     }else if(!$validade){
 
-        $this->context->controller->errors[] = 'WebmaniaBR NF-e: Certificado Digital A1 vencido. Emita um novo para continuar operando.';
+        $this->context->controller->warnings[] = 'WebmaniaBR NF-e: Certificado Digital A1 vencido. Emita um novo para continuar operando.';
 
     }
 

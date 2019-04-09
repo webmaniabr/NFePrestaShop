@@ -1,19 +1,18 @@
-<?php
+<?php 
 
 $fields_values = $this->getConfigFieldsValues();
+
 $carriers = $fields_values[$this->name.'carriers'];
 
-if ($carriers){
-
+if($carriers){
   $carriers = base64_decode(str_replace('%', '=', $carriers));
-  $carriers = iconv('UTF-8', 'UTF-8//IGNORE', utf8_encode($carriers));
   $carriers = json_decode(stripslashes(html_entity_decode($carriers)), true);
-
-} else {
-
+}else{
   $carriers = array();
-
 }
+
+
+
 
 ?>
 
@@ -84,10 +83,10 @@ if ($carriers){
             </label>
             <div class="col-lg-9">
                <div class="radio ">
-                  <label><input type="radio" name="webmaniabrnfeautomatic_emit" value="on" <?php if($fields_values[$this->name.'automatic_emit'] == 'on') echo 'checked="checked"'; ?>>Ativado</label>
+                  <label><input type="radio" name="webmaniabrnfeautomatic_emit" id="on" value="on" <?php if($fields_values[$this->name.'automatic_emit'] == 'on') echo 'checked="checked"'; ?>>Ativado</label>
                </div>
                <div class="radio ">
-                  <label><input type="radio" name="webmaniabrnfeautomatic_emit" value="off" <?php if($fields_values[$this->name.'automatic_emit'] == 'off') echo 'checked="checked"'; ?>>Desativado</label>
+                  <label><input type="radio" name="webmaniabrnfeautomatic_emit" id="off" value="off" <?php if($fields_values[$this->name.'automatic_emit'] == 'off') echo 'checked="checked"'; ?>>Desativado</label>
                </div>
                <p class="help-block">
                   Emitir automaticamente a NF-e sempre que que um pagamento for confirmado
@@ -97,14 +96,14 @@ if ($carriers){
          <div class="form-group">
             <label class="control-label col-lg-3">
             Envio automático de email
-
+            
             </label>
             <div class="col-lg-9">
                <div class="radio ">
-                  <label><input type="radio" name="webmaniabrnfeenvio_email" value="on" <?php if($fields_values[$this->name.'envio_email'] == 'on') echo 'checked="checked"'; ?>>Ativado</label>
+                  <label><input type="radio" name="webmaniabrnfeenvio_email" id="on" value="on" <?php if($fields_values[$this->name.'envio_email'] == 'on') echo 'checked="checked"'; ?>>Ativado</label>
                </div>
                <div class="radio ">
-                  <label><input type="radio" name="webmaniabrnfeenvio_email" value="off" <?php if($fields_values[$this->name.'envio_email'] == 'off') echo 'checked="checked"'; ?>>Desativado</label>
+                  <label><input type="radio" name="webmaniabrnfeenvio_email" id="off" value="off" <?php if($fields_values[$this->name.'envio_email'] == 'off') echo 'checked="checked"'; ?>>Desativado</label>
                </div>
                <p class="help-block">
                   <em style="color:red">Atenção: O email será enviado mesmo para notas emitidas em ambiente de homologação!</em>
@@ -159,53 +158,53 @@ if ($carriers){
                <input type="text" name="webmaniabrnfecest_code" id="webmaniabrnfecest_code" value="<?php echo $fields_values[$this->name.'cest_code']; ?>" class="" size="50">
             </div>
          </div>
-
+         
          <div class="form-group">
             <label class="control-label col-lg-3">
-            CNPJ do fabricante da mercadoria
+            CNPJ do fabricante da mercadoria 
             </label>
             <div class="col-lg-9">
                <input type="text" name="webmaniabrnfecnpj_fabricante" id="webmaniabrnfecnpj_fabricante" value="<?php echo $fields_values[$this->name.'cnpj_fabricante']; ?>" class="" size="50">
             </div>
          </div>
-
+         
          <div class="form-group">
             <label class="control-label col-lg-3">
-            Indicador de escala relevante
+            Indicador de escala relevante 
             </label>
             <div class="col-lg-9">
                <select name="webmaniabrnfeind_escala" class=" fixed-width-xl" id="webmaniabrnfeind_escala">
                  <option value="">Selecionar</option>
-                 <?php
-
+                 <?php 
+                 
                  $options = array(
                    'S' => 'S - Produzido em Escala Relevante',
                    'N' => 'N - Produzido em Escala NÃO Relevante',
                   );
-
+                  
                   foreach($options as $value => $label){
-
+                    
                     $selected = $value == $fields_values[$this->name.'ind_escala'] ? 'selected' : '';
                     echo '<option value="'.$value.'" '.$selected.'>'.$label.'</option>';
-
+                    
                   }
-
+                  
                   ?>
 
                </select>
             </div>
          </div>
-
-
+         
+         
          <div class="form-group">
             <label class="control-label col-lg-3">
             Origem dos Produtos
             </label>
             <div class="col-lg-9">
                <select name="webmaniabrnfeproduct_source" class=" fixed-width-xl" id="webmaniabrnfeproduct_source">
-
-                 <?php
-
+                 
+                 <?php 
+                 
                  $options = array(
                    '-1' => 'Selecionar Origem dos Produtos',
                    '00' => '0 - Nacional, exceto as indicadas nos códigos 3, 4, 5, e 8',
@@ -218,14 +217,14 @@ if ($carriers){
                    '7'  => '7 - Estrangeira - Adquirida no mercado interno, sem similar nacional, constante lista CAMEX e gás natural',
                    '8'  => '8 - Nacional, mercadoria ou bem com Conteúdo de Importação superior a 70%',
                   );
-
+                  
                   foreach($options as $value => $label){
-
+                    
                     $selected = $value == $fields_values[$this->name.'product_source'] ? 'selected' : '';
                     echo '<option value="'.$value.'" '.$selected.'>'.$label.'</option>';
-
+                    
                   }
-
+                  
                   ?>
 
                </select>
@@ -269,22 +268,22 @@ if ($carriers){
             </label>
             <div class="col-lg-9">
                <div class="radio ">
-                  <label><input type="radio" name="webmaniabrnfecpf_cnpj_status" value="on" <?php if($fields_values[$this->name.'cpf_cnpj_status'] == 'on') echo 'checked="checked"'; ?>>Ativado</label>
+                  <label><input type="radio" name="webmaniabrnfecpf_cnpj_status" id="on" value="on" <?php if($fields_values[$this->name.'cpf_cnpj_status'] == 'on') echo 'checked="checked"'; ?>>Ativado</label>
                </div>
                <div class="radio ">
-                  <label><input type="radio" name="webmaniabrnfecpf_cnpj_status" value="off" <?php if($fields_values[$this->name.'cpf_cnpj_status'] == 'off') echo 'checked="checked"'; ?>>Desativado</label>
+                  <label><input type="radio" name="webmaniabrnfecpf_cnpj_status" id="off" value="off" <?php if($fields_values[$this->name.'cpf_cnpj_status'] == 'off') echo 'checked="checked"'; ?>>Desativado</label>
                </div>
             </div>
          </div>
-
+         
          <div class="form-group" style="<?php if($fields_values[$this->name.'cpf_cnpj_status'] == 'on') echo 'display:none'; ?>">
             <label class="control-label col-lg-3">
                Mapeamento
             </label>
             <div class="col-lg-9">
-
-
-
+              
+              
+              
                <table class="table nfe-docs-table">
                   <thead>
                     <th></th>
@@ -312,7 +311,7 @@ if ($carriers){
                </table>
             </div>
          </div>
-
+         
 
          <div class="form-group">
             <label class="control-label col-lg-3">
@@ -320,10 +319,10 @@ if ($carriers){
             </label>
             <div class="col-lg-9">
                <div class="radio ">
-                  <label><input type="radio" name="webmaniabrnfenumero_compl_status" value="on">Ativado</label>
+                  <label><input type="radio" name="webmaniabrnfenumero_compl_status" id="on" value="on">Ativado</label>
                </div>
                <div class="radio ">
-                  <label><input type="radio" name="webmaniabrnfenumero_compl_status" value="off" checked="checked">Desativado</label>
+                  <label><input type="radio" name="webmaniabrnfenumero_compl_status" id="off" value="off" checked="checked">Desativado</label>
                </div>
             </div>
          </div>
@@ -332,7 +331,7 @@ if ($carriers){
             Nome do campo Número (Endereço)
             </label>
             <div class="col-lg-9">
-               <input type="text" name="webmaniabrnfenumero_field" id="webmaniabrnfenumero_field" value="<?php echo $fields_values[$this->name.'numero_field']; ?>" class="" size="50">
+               <input type="text" name="webmaniabrnfenumero_field" id="webmaniabrnfenumero_field" value="address_number" class="" size="50">
             </div>
          </div>
       </div>
@@ -390,19 +389,19 @@ if ($carriers){
                      <th>Forma de Pagamento</th>
                   </thead>
                   <tbody>
-                     <?php
+                     <?php 
                         $payment_methods = $this->get_payment_methods_options();
                         foreach($payment_methods as $method):
-
+                           
                            $saved_value = Configuration::get('webmaniabrnfepayment_'.$method['value']);
-
+                           
                      ?>
                            <tr>
                               <td><?php echo $method['label']; ?></td>
                               <td>
                                  <select style="max-width: 300px" name="webmaniabrnfepayment_<?php echo $method['value']; ?>">
                                     <option value="">Selecionar</option>
-                                 <?php
+                                 <?php 
                                     $options = array(
                            				'01' => 'Dinheiro',
                            				'02' => 'Cheque',
@@ -412,25 +411,25 @@ if ($carriers){
                            				'90' => 'Sem pagamento',
                            				'99' => 'Outros',
                            			);
-
+                           			
                            			foreach($options as $value => $label){
-
+                           			  
                            			  $selected = $saved_value == $value ? 'selected' : '';
-
+                           			  
                            			  echo '<option value="'.$value.'" '.$selected.'>'.$label.'</option>';
                               		}
-
+                        			
                         	        ?>
                         	        </select>
                               </td>
                            </tr>
-
+                           
                      <?php endforeach; ?>
                   </tbody>
                </table>
             </div>
          </div>
-
+      
       </div>
       <!-- /.form-wrapper -->
    </div>
@@ -455,7 +454,7 @@ if ($carriers){
                </div>
             </div>
          </div>
-
+         
          <div class="form-group">
             <label class="control-label col-lg-3">
             Transportadoras
@@ -463,21 +462,21 @@ if ($carriers){
             <div class="col-lg-9">
               <div class="carriers-list">
                 <?php
-
+                
                   foreach($carriers as $carrier){
                     echo '<div class="carrier-item" data-id="'.$carrier['id'].'">
                             <p>'.$carrier['razao_social'].' <br/>(<span>Editar</span>)</p>
                             <span class="delete">x</span>
                           </div>';
                   }
-
+                  
                 ?>
               </div>
               <button type="button" class="btn btn-primary btn--add-carrier" data-toggle="modal" data-target="#add-carrier-modal">Adicionar transportadora</button>
               <input type="hidden"  name="webmaniabrnfecarriers" value="<?php echo str_replace('%', '=', $fields_values[$this->name.'carriers']); ?>" />
             </div>
          </div>
-
+         
       </div>
       <!-- /.form-wrapper -->
    </div>
@@ -507,9 +506,9 @@ if ($carriers){
               <div class="col-sm-9">
                   <select style="margin-top:10px" name="webmaniabrnfe_transp_method">
                     <?php
-
+                    
                     $methods = $this->get_shipping_methods_options();
-
+                    
                     foreach($methods as $method){
                       $selected = '';
                       //if($id == $webmaniabrnfe_transp_method){
@@ -517,7 +516,7 @@ if ($carriers){
                       //}
                       echo '<option value="'.$method['id_option'].'" '.$selected.'>'.$method['name'].'</option>';
                     }
-
+          
                     ?>
                   </select>
               </div>
