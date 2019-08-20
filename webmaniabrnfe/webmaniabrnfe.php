@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.7.5';
+    $this->version = '2.7.6';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -846,7 +846,7 @@ class WebmaniaBrNFe extends Module{
   *******************HOOKED FUNCTIONS **********************
   ***********************************************************/
 
-  public function hookBackOfficeHeader($params){
+  public function hookBackOfficeHeader($params = null){
 
     $this->listen_notification();
     $this->processBulkEmitirNfe();
@@ -902,7 +902,7 @@ class WebmaniaBrNFe extends Module{
 
   }
 
-  public function hookDisplayBackOfficeHeader($params){
+  public function hookDisplayBackOfficeHeader($params = null){
 
     $this->hookBackOfficeHeader($params);
 
@@ -915,7 +915,7 @@ class WebmaniaBrNFe extends Module{
   }
 
 
-  public function hookDisplayInvoice($params) {
+  public function hookDisplayInvoice($params = null) {
 
     $order_id = $params['id_order'];
     $order = new Order($order_id);
@@ -928,7 +928,7 @@ class WebmaniaBrNFe extends Module{
 
   }
 
-  public function hookDisplayAdminOrderTabShip($order, $products, $customer){
+  public function hookDisplayAdminOrderTabShip($order = null, $products = null, $customer = null){
 
     $include_shipping_info = Configuration::get($this->name.'transp_include');
     if($include_shipping_info != 'on') return false;
@@ -938,7 +938,7 @@ class WebmaniaBrNFe extends Module{
   }
 
 
-  public function hookDisplayAdminOrderContentShip($order, $products, $customer){
+  public function hookDisplayAdminOrderContentShip($order = null, $products = null, $customer = null){
 
     $include_shipping_info = Configuration::get($this->name.'transp_include');
     if($include_shipping_info != 'on') return false;
@@ -1070,7 +1070,7 @@ class WebmaniaBrNFe extends Module{
 
   }
 
-  public function hookDisplayHeader($params){
+  public function hookDisplayHeader($params = null){
 
 
     $this->listen_notification();
@@ -1119,7 +1119,7 @@ class WebmaniaBrNFe extends Module{
    * Add custom column to admin orders page
    */
 
-  public function hookActionAdminOrdersListingFieldsModifier($params){
+  public function hookActionAdminOrdersListingFieldsModifier($params = null){
 
     $params['fields'] = array_slice($params['fields'], 0, 2, true) +
       array('nfe_issued' => array(
@@ -1132,7 +1132,7 @@ class WebmaniaBrNFe extends Module{
 
     }
 
-  public function hookActionPaymentConfirmation($params){
+  public function hookActionPaymentConfirmation($params = null){
 
     $orderID = $params['id_order'];
     $automatic = Configuration::get($this->name.'automatic_emit');
@@ -1143,7 +1143,7 @@ class WebmaniaBrNFe extends Module{
 
   }
 
-  public function hookDisplayAdminProductsExtra($params){
+  public function hookDisplayAdminProductsExtra($params = null){
 
     $product_id = (int)Tools::getValue('id_product');
     if(!$product_id) $product_id = $params['id_product'];
@@ -1176,7 +1176,7 @@ class WebmaniaBrNFe extends Module{
 
   }
 
-  public function hookActionProductUpdate($params){
+  public function hookActionProductUpdate($params = null){
 
     $id_product = (int) Tools::getValue('id_product');
     if(!Db::getInstance()->update('product', array(
@@ -1220,7 +1220,7 @@ class WebmaniaBrNFe extends Module{
 
   }
 
-  public function hookActionCustomerAccountAdd($params){
+  public function hookActionCustomerAccountAdd($params = null){
 
     $customer_data = array();
     $customer_id = (int)$params['newCustomer']->id;
@@ -1287,7 +1287,7 @@ class WebmaniaBrNFe extends Module{
   }
 
   /* 1.7 Only */
-  public function hookValidateCustomerFormFields( $params ){
+  public function hookValidateCustomerFormFields($params = null){
 
     if(!$this->isDocumentsEnabled()) return $params;
 
@@ -1326,7 +1326,7 @@ class WebmaniaBrNFe extends Module{
 
 
   /* 1.7 Only */
-  public function hookAdditionalCustomerFormFields($params){
+  public function hookAdditionalCustomerFormFields($params = null){
 
     if(!$this->isDocumentsEnabled()) return array();
 
@@ -1487,7 +1487,7 @@ class WebmaniaBrNFe extends Module{
 
   }
 
-  public function hookCreateAccount($params){
+  public function hookCreateAccount($params = null){
 
     $customer_data = $params['_POST'];
     $customer_id = (int)$params['newCustomer']->id;
@@ -1514,7 +1514,7 @@ class WebmaniaBrNFe extends Module{
 
   }
 
-  public function hookActionCategoryUpdate( $params ) {
+  public function hookActionCategoryUpdate($params = null) {
 
     $category_id = Tools::getValue('id_category');
     $values = Tools::getAllValues();
@@ -1588,21 +1588,21 @@ class WebmaniaBrNFe extends Module{
 
   }
 
-  public function hookActionObjectAddressUpdateAfter( $params ) {
+  public function hookActionObjectAddressUpdateAfter($params = null) {
 
     $address_id = $params['object']->id;
     $this->updateAddressInfo($address_id);
 
   }
 
-  public function hookActionObjectAddressAddAfter( $params ) {
+  public function hookActionObjectAddressAddAfter($params = null) {
 
     $address_id = $params['object']->id;
     $this->updateAddressInfo($address_id);
 
   }
 
-  public function hookActionObjectUpdateAfter( $params ){
+  public function hookActionObjectUpdateAfter($params = null){
 
     if( is_a($params['object'], 'Address')){
       $address_id = $params['object']->id;
@@ -1711,14 +1711,14 @@ class WebmaniaBrNFe extends Module{
   }
 
 
-  public function hookActionObjectCustomerUpdateAfter( $params ){
+  public function hookActionObjectCustomerUpdateAfter($params = null){
 
     $customer_id = $params['object']->id;
     $this->updateCustomerDocument($customer_id);
 
   }
 
-  public function hookActionObjectCustomerAddAfter( $params ){
+  public function hookActionObjectCustomerAddAfter($params = null){
 
     $customer_id = $params['object']->id;
     $this->updateCustomerDocument($customer_id);
