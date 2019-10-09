@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.7.6';
+    $this->version = '2.7.8';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -1034,6 +1034,7 @@ class WebmaniaBrNFe extends Module{
       'nfe_especie' => pSQL(Tools::getValue('nfe_especie')),
       'nfe_peso_bruto' => pSQL(Tools::getValue('nfe_peso_bruto')),
       'nfe_peso_liquido' => pSQL(Tools::getValue('nfe_peso_liquido')),
+      'nfe_valor_seguro' => pSQL(Tools::getValue('nfe_valor_seguro')),
     ),'id_order = ' .$order_id )){
       $this->context->controller->_errors[] = 'Error: '.mysql_error();
     }
@@ -1044,7 +1045,7 @@ class WebmaniaBrNFe extends Module{
 
     $order_id = (int) $order_id;
 
-    $transporte_info = Db::getInstance()->getRow("SELECT nfe_modalidade_frete, nfe_volumes, nfe_especie, nfe_peso_bruto, nfe_peso_liquido FROM "._DB_PREFIX_."orders WHERE id_order = $order_id");
+    $transporte_info = Db::getInstance()->getRow("SELECT nfe_modalidade_frete, nfe_volumes, nfe_especie, nfe_peso_bruto, nfe_peso_liquido, nfe_valor_seguro FROM "._DB_PREFIX_."orders WHERE id_order = $order_id");
 
     return $transporte_info;
 
@@ -1902,6 +1903,7 @@ class WebmaniaBrNFe extends Module{
     // Array start
     $data = array(
         'ID' => $order->id, // Número do pedido
+        'origem' => 'prestashop_1.x',
         'url_notificacao' => Tools::getHttpHost(true).__PS_BASE_URI__.'?retorno_nfe='.$uniq_key.'&order_id='.$order->id,
         'operacao' => 1, // Tipo de Operação da Nota Fiscal
         'natureza_operacao' => Configuration::get($this->name.'operation_type'), // Natureza da Operação
@@ -2138,13 +2140,14 @@ class WebmaniaBrNFe extends Module{
            );
 
 
-           $transporte_info = Db::getInstance()->getRow("SELECT nfe_modalidade_frete, nfe_volumes, nfe_especie, nfe_peso_bruto, nfe_peso_liquido FROM "._DB_PREFIX_."orders WHERE id_order = $orderID");
+           $transporte_info = Db::getInstance()->getRow("SELECT nfe_modalidade_frete, nfe_volumes, nfe_especie, nfe_peso_bruto, nfe_peso_liquido, nfe_valor_seguro FROM "._DB_PREFIX_."orders WHERE id_order = $orderID");
 
            $transporte_keys = array(
              'nfe_volumes'      => 'volume',
              'nfe_especie'      => 'especie',
              'nfe_peso_bruto'   => 'peso_bruto',
-             'nfe_peso_liquido' => 'peso_liquido'
+             'nfe_peso_liquido' => 'peso_liquido',
+             'nfe_valor_seguro' => 'seguro'
            );
 
            foreach($transporte_keys as $db_key => $api_key){
@@ -2354,6 +2357,14 @@ class WebmaniaBrNFe extends Module{
         $this->context->controller->errors[] = 'Erro ao atualizar status da NF-e';
       }
 
+      if(!Db::getInstance()->update('orders', array('nfe_numero' => $response->nfe), 'id_order = ' .$orderID )){
+        $this->context->controller->errors[] = 'Erro ao atualizar status da NF-e';
+      }
+
+      if(!Db::getInstance()->update('orders', array('nfe_chave_de_acesso' => $response->chave), 'id_order = ' .$orderID )){
+        $this->context->controller->errors[] = 'Erro ao atualizar status da NF-e';
+      }
+
       if(!Db::getInstance()->update('orders', array('nfe_issued' => 1), 'id_order = ' .$orderID )){
         $this->context->controller->errors[] = 'Erro ao alterar status da NF-e #'.$orderID;
       }
@@ -2461,13 +2472,25 @@ class WebmaniaBrNFe extends Module{
           'name' => 'nfe_issued',
           'sql' => ' ADD COLUMN nfe_issued TINYINT DEFAULT 0'
         ),
+
         'nfe_info' => array(
           'name' => 'nfe_info',
           'sql' => ' ADD COLUMN nfe_info TEXT'
         ),
+
         'nfe_modalidade_frete' => array(
           'name' => 'nfe_modalidade_frete',
           'sql' => ' ADD COLUMN nfe_modalidade_frete VARCHAR(5) DEFAULT 0'
+        ),
+
+        'nfe_numero' => array(
+          'name' => 'nfe_numero',
+          'sql' => ' ADD COLUMN nfe_numero TEXT'
+        ),
+
+        'nfe_chave_de_acesso' => array(
+          'name' => 'nfe_chave_de_acesso',
+          'sql' => ' ADD COLUMN nfe_chave_de_acesso VARCHAR(44) DEFAULT 0'
         ),
 
         'nfe_volumes'  => array(
@@ -2488,6 +2511,11 @@ class WebmaniaBrNFe extends Module{
         'nfe_peso_liquido'  => array(
           'name' => 'nfe_peso_liquido',
           'sql' => ' ADD COLUMN nfe_peso_liquido VARCHAR(10)'
+        ),
+
+        'nfe_valor_seguro'  => array(
+          'name' => 'nfe_valor_seguro',
+          'sql' => ' ADD COLUMN nfe_valor_seguro VARCHAR(10)'
         ),
       ));
 
