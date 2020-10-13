@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.8.2';
+    $this->version = '2.8.3';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -2068,8 +2068,7 @@ class WebmaniaBrNFe extends Module{
        /*
        * Default values
        */
-       if (!$peso) $peso = '0.100';
-       $peso = number_format($peso, 3, '.', '');
+       if ($peso) $peso = number_format($peso, 3, '.', '');
        if (!$gtin) $gtin = Configuration::get($this->name.'ean_barcode');
        if (!$gtin_tributavel) $gtin_tributavel = Configuration::get($this->name.'gtin_tributavel');
        if (!$codigo_ncm){
