@@ -77,5 +77,5 @@ Você pode gerenciar todas as Notas Fiscais e realizar a impressão do Danfe no 
 
 ## Suporte
 
-Qualquer dúvida entre em contato na nossa [Central de Ajuda](https://ajuda.webmaniabr.com).
+Qualquer dúvida cesse o [Painel WebmaniaBR®](https://webmaniabr.com/painel/) para *abrir um chamado* ou conversar em tempo real no *chat*.
 
