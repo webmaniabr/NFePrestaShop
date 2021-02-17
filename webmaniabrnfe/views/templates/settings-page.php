@@ -319,10 +319,10 @@ if($carriers){
             </label>
             <div class="col-lg-9">
                <div class="radio ">
-                  <label><input type="radio" name="webmaniabrnfenumero_compl_status" id="on" value="on">Ativado</label>
+                  <label><input type="radio" name="webmaniabrnfenumero_compl_status" id="on" value="on" <?php if($fields_values[$this->name.'numero_compl_status'] == 'on') echo 'checked="checked"'; ?>>Ativado</label>
                </div>
                <div class="radio ">
-                  <label><input type="radio" name="webmaniabrnfenumero_compl_status" id="off" value="off" checked="checked">Desativado</label>
+                  <label><input type="radio" name="webmaniabrnfenumero_compl_status" id="off" value="off" <?php if($fields_values[$this->name.'numero_compl_status'] == 'off') echo 'checked="checked"'; ?>>Desativado</label>
                </div>
             </div>
          </div>
@@ -407,7 +407,17 @@ if($carriers){
                            				'02' => 'Cheque',
                            				'03' => 'Cartão de Crédito',
                            				'04' => 'Cartão de Débito',
-                           				'15' => 'Boleto Bancário',
+                                       '05' => 'Crédito Loja',
+                                       '10' => 'Vale Alimentação',
+                                       '11' => 'Vale Refeição',
+                                       '12' => 'Vale Presente',
+                                       '13' => 'Vale Combustível',
+                                       '14' => 'Duplicata Mercantil',
+                                       '15' => 'Boleto Bancário',
+                           				'16' => 'Depósito Bancário',
+                                       '17' => 'Pagamento Instantâneo (PIX)',
+                                       '18' => 'Transferência bancária, Carteira Digital',
+                                       '19' => 'Programa de fidelidade, Cashback, Crédito Virtual',
                            				'90' => 'Sem pagamento',
                            				'99' => 'Outros',
                            			);

@@ -14,7 +14,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.8.3';
+    $this->version = '2.8.4';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -1204,12 +1204,12 @@ class WebmaniaBrNFe extends Module{
     if($customer_data['document_type'] == 'cpf'){
       $DB_data = array(
         'nfe_document_type'   => pSQL($customer_data['document_type']),
-        'nfe_document_number' => pSQL($customer_data['cpf']),
+        'nfe_document_number' => pSQL(preg_replace("/[^0-9]/", "", $customer_data['cpf'])),
       );
     }elseif($customer_data['document_type'] == 'cnpj'){
       $DB_data = array(
         'nfe_document_type'   => pSQL($customer_data['document_type']),
-        'nfe_document_number' => pSQL($customer_data['cnpj']),
+        'nfe_document_number' => pSQL(preg_replace("/[^0-9]/", "", $customer_data['cnpj'])),
         'nfe_razao_social'    => pSQL($customer_data['razao_social']),
         'nfe_pj_ie'           => pSQL($customer_data['cnpj_ie']),
       );
