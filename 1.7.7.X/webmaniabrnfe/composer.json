@@ -1,0 +1,13 @@
+{
+  "name": "wmbr/webmaniabrnfe",
+  "description": "...",
+  "autoload": {
+    "psr-4": {
+      "webmaniabrnfe\\Controller\\": "controllers/admin/"
+    }
+  },
+  "config": {
+      "prepend-autoloader": false
+  },
+  "type": "prestashop-module"
+}

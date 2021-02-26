@@ -1,0 +1,5 @@
+webmaniabrnfe_emitirnfe:
+  path: webmaniabrnfe/emitirnfe
+  methods: [POST]
+  defaults:
+    _controller: 'webmaniabrnfe\Controller\EmitirNfeController::receiveBulkAction'
