@@ -430,6 +430,43 @@ jQuery(document).ready(function(){
       handleBairroStatus(bairro_status);
     });
 
+    $('input[name="webmaniabrnfeintermediador_cnpj').mask("99.999.999/9999-99");
+
+    update_payment_desc_label = function() {
+      
+      var descs_active = $('.webmaniabrnfepayment-desc').filter(function() { 
+        return $(this).css('display') !== 'none'; 
+      }).size();
+
+      if (descs_active > 0) {
+        $('.payment-desc-title').show();
+      }
+      else {
+        $('.payment-desc-title').hide();
+      } 
+
+    }
+
+    update_payment_desc_label();
+
+    // Show payment desc field if payment method is 99
+    $('.webmaniabrnfepayment-methods-sel').change(function(element) {
+			
+			var payment_desc = $(event.target).parent().parent().find('.webmaniabrnfepayment-desc');
+			
+			if (element.target.value == 99) {
+				$(payment_desc).show();
+        $('.payment-desc-title').show();
+			}
+			else {
+				$(payment_desc).val('');
+				$(payment_desc).hide();
+			}
+
+      update_payment_desc_label();
+			
+		});
+
   }
   
   

@@ -10,14 +10,17 @@ class ComposerStaticInite9167a9c9898518d371813bed43a0b76
         'w' => 
         array (
             'webmaniabrnfe\\Controller\\' => 25,
-        ),
+        )
     );
 
     public static $prefixDirsPsr4 = array (
         'webmaniabrnfe\\Controller\\' => 
         array (
             0 => __DIR__ . '/../..' . '/controllers/admin',
-        ),
+        )
+    );
+
+    public static $classMap = array (
     );
 
     public static function getInitializer(ClassLoader $loader)
@@ -25,6 +28,7 @@ class ComposerStaticInite9167a9c9898518d371813bed43a0b76
         return \Closure::bind(function () use ($loader) {
             $loader->prefixLengthsPsr4 = ComposerStaticInite9167a9c9898518d371813bed43a0b76::$prefixLengthsPsr4;
             $loader->prefixDirsPsr4 = ComposerStaticInite9167a9c9898518d371813bed43a0b76::$prefixDirsPsr4;
+            $loader->classMap = ComposerStaticInite9167a9c9898518d371813bed43a0b76::$classMap;
 
         }, null, ClassLoader::class);
     }

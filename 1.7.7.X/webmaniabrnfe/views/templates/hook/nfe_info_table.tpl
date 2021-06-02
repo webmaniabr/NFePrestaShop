@@ -7,13 +7,13 @@
       <thead>
         <tr>
           <tr>
-            <th id="columnname" class="manage-column column-columnname" scope="col" width="15%">Data</th>
+            <th id="columnname" class="manage-column column-columnname" scope="col" width="5%">Data</th>
             <th id="columnname" class="manage-column column-columnname" scope="col" width="5%">Série</th>
             <th id="columnname" class="manage-column column-columnname" scope="col" width="5%">Nº</th>
-            <th id="columnname" class="manage-column column-columnname" scope="col" width="15%">RPS</th>
+            <th id="columnname" class="manage-column column-columnname" scope="col" width="10%">RPS</th>
             <th id="columnname" class="manage-column column-columnname" scope="col">Código Verificação</th>
             <th id="columnname" class="manage-column column-columnname" scope="col" width="10%">Arquivo XML</th>
-            <th id="columnname" class="manage-column column-columnname" scope="col" width="10%">Danfe</th>
+            <th id="columnname" class="manage-column column-columnname" scope="col" width="30%">PDF</th>
             <th id="columnname" class="manage-column column-columnname" scope="col" width="10%">Status</th>
           </tr>
         </tr>
@@ -25,8 +25,12 @@
           <td class="column-columnname">{$order_nfe['n_nfe']}</td>
           <td class="column-columnname">{$order_nfe['n_recibo']}</td>
           <td class="column-columnname">{$order_nfe['chave_acesso']}</td>
-          <td class="column-columnname"><a class="btn btn-outline-primary" target="_blank" href="{$order_nfe['url_xml']}">Download XML</a></td>
-          <td class="column-columnname"><a class="btn btn-outline-primary" target="_blank" href="{$order_nfe['url_danfe']}">Visualizar Nota</a></td>
+          <td class="column-columnname"><a class="" target="_blank" href="{$order_nfe['url_xml']}">Download XML</a></td>
+          <td class="column-columnname">
+            <a class="" target="_blank" href="{$order_nfe['url_danfe']}">Danfe </a>|
+            <a class="" target="_blank" href="{$order_nfe['url_danfe_simplificada']}"> Danfe Simples </a>|
+            <a class="" target="_blank" href="{$order_nfe['url_danfe_etiqueta']}"> Danfe Etiqueta</a>
+          </td>
           <td class="column-columnname" style="padding: 10px 10px;">
             <span class="nfe-status {$order_nfe['status']}">{$order_nfe['status']}</span>
             <a href="{$url}&atualizar=1&chave={$order_nfe['chave_acesso']}" title="Atualizar status"><i class="material-icons">refresh</i></a>

@@ -6,5 +6,5 @@ $vendorDir = dirname(dirname(__FILE__));
 $baseDir = dirname($vendorDir);
 
 return array(
-    'webmaniabrnfe\\Controller\\' => array($baseDir . '/controllers/admin'),
+    'webmaniabrnfe\\Controller\\' => array($baseDir . '/controllers/admin')
 );

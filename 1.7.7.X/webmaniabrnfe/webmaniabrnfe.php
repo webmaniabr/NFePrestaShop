@@ -7,11 +7,11 @@ if(!defined('_PS_VERSION_')){
 if(!defined('_MAIN_PS_VERSION_'))
 define('_MAIN_PS_VERSION_', substr(_PS_VERSION_, 0, 3));
 require_once('sdk/NFe.php');
+require_once('inc/pdf/PDFMerger.php');
 
 use PrestaShop\PrestaShop\Core\Grid\Column\Type\DataColumn;
 use PrestaShop\PrestaShop\Core\Grid\Column\ColumnCollection;
 use PrestaShop\PrestaShop\Core\Grid\Action\Bulk\Type\SubmitBulkAction;
-
 
 class WebmaniaBrNFe extends Module{
 
@@ -20,7 +20,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.8.4';
+    $this->version = '2.9.0';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -147,6 +147,33 @@ class WebmaniaBrNFe extends Module{
           'submit_method' => 'POST'
         ])
       );
+    
+    $bulkActions->add(
+      (new SubmitBulkAction('imprimir_danfe'))
+        ->setName('Imprimir Danfe')
+        ->setOptions([
+          'submit_route' => 'webmaniabrnfe_imprimir_danfe',
+          'submit_method' => 'POST'
+        ])
+      );
+    
+    $bulkActions->add(
+      (new SubmitBulkAction('imprimir_danfe_simples'))
+        ->setName('Imprimir Danfe Simples')
+        ->setOptions([
+          'submit_route' => 'webmaniabrnfe_imprimir_danfe_simples',
+          'submit_method' => 'POST'
+        ])
+      );
+      
+    $bulkActions->add(
+      (new SubmitBulkAction('imprimir_danfe_etiqueta'))
+        ->setName('Imprimir Danfe Etiqueta')
+        ->setOptions([
+          'submit_route' => 'webmaniabrnfe_imprimir_danfe_etiqueta',
+          'submit_method' => 'POST'
+        ])
+      );
   }
 
   public function hookActionOrderGridQueryBuilderModifier(array $params)
@@ -185,6 +212,15 @@ class WebmaniaBrNFe extends Module{
                 </div>
             </div>
             ";
+      }
+
+      foreach ($nfe_info as $key => $nfe) {
+        if (!$nfe['url_danfe_simplificada']) {
+          $nfe_info[$key]['url_danfe_simplificada'] = str_replace('/danfe/', '/danfe/simples/', $nfe['url_danfe']);
+        }
+        if (!$nfe['url_danfe_etiqueta']) {
+          $nfe_info[$key]['url_danfe_etiqueta'] = str_replace('/danfe/', '/danfe/etiqueta/', $nfe['url_danfe']);
+        }
       }
 
       if(Tools::getValue('nfe-transporte-info')){
@@ -803,6 +839,9 @@ class WebmaniaBrNFe extends Module{
       $this->name.'cnpj_fabricante' => Configuration::get($this->name.'cnpj_fabricante'),
       $this->name.'ind_escala' => Configuration::get($this->name.'ind_escala'),
       $this->name.'product_source' => Configuration::get($this->name.'product_source'),
+      $this->name.'intermediador' => Configuration::get($this->name.'intermediador'),
+      $this->name.'intermediador_cnpj' => Configuration::get($this->name.'intermediador_cnpj'),
+      $this->name.'intermediador_id' => Configuration::get($this->name.'intermediador_id'),
       $this->name.'person_type_fields' => Configuration::get($this->name.'person_type_fields'),
       $this->name.'mask_fields' => Configuration::get($this->name.'mask_fields'),
       $this->name.'fill_address' => Configuration::get($this->name.'fill_address'),
@@ -832,6 +871,7 @@ class WebmaniaBrNFe extends Module{
       $this->name.'transp_city'    => Configuration::get($this->name.'transp_city'),
       $this->name.'transp_uf'      => Configuration::get($this->name.'transp_uf'),
       $this->name.'carriers'       => Configuration::get($this->name.'carriers'),
+
 
       $this->name.'docscolumn_cpf'   => Configuration::get($this->name.'docscolumn_cpf'),
       $this->name.'docscolumn_cnpj'  => Configuration::get($this->name.'docscolumn_cnpj'),
@@ -866,6 +906,9 @@ class WebmaniaBrNFe extends Module{
       $this->name.'cnpj_fabricante' => '',
       $this->name.'ind_escala' => '',
       $this->name.'product_source' => '0',
+      $this->name.'intermediador' => '0',
+      $this->name.'intermediador_cnpj' => '',
+      $this->name.'intermediador_id' => '',
       $this->name.'person_type_fields' => 'on',
       $this->name.'mask_fields' => 'off',
       $this->name.'enable_person_type' => 'off',
@@ -911,6 +954,7 @@ class WebmaniaBrNFe extends Module{
     $payment_methods = $this->get_payment_methods_options();
     foreach($payment_methods as $method){
       $arr[$this->name.'payment_'.$method['value']] = '';
+      $arr[$this->name.'payment_'.$method['value'].'_desc'] = '';
     }
 
     return $arr;
@@ -946,10 +990,9 @@ class WebmaniaBrNFe extends Module{
     if(_MAIN_PS_VERSION_ == '1.6' || _MAIN_PS_VERSION_ == '1.7'){
       $controller_name = $this->context->controller->controller_name;
       $this->context->controller->addJquery();
-      if($controller_name == 'AdminCustomers'){
+      if($controller_name == 'AdminCustomers' || $controller_name == 'AdminModules'){
         $this->context->controller->addJS($this->_path.'/js/jquery.mask.min.js', 'all');
       }
-
 
       $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
       $numero_enabled = Configuration::get($this->name.'numero_compl_status');
@@ -1949,12 +1992,19 @@ class WebmaniaBrNFe extends Module{
          'total' => number_format($order->total_paid_tax_incl, 2, '.', ''),  // Total do pedido - sem descontos
      );
 
+     // Intermediador da operação
+     $intermediador = Configuration::get($this->name.'intermediador');
+     $data['pedido']['intermediador'] = ($intermediador == '00') ? '0' : $intermediador;
+     $data['pedido']['cnpj_intermediador'] = Configuration::get($this->name.'intermediador_cnpj');
+     $data['pedido']['id_intermediador'] = Configuration::get($this->name.'intermediador_id');
 
      $payment_module = $order->module;
      $payment_method = Configuration::get('webmaniabrnfepayment_'.$payment_module);
+     $payment_desc = Configuration::get('webmaniabrnfepayment_'.$payment_module.'_desc');
 
      if($payment_method){
        $data['pedido']['forma_pagamento'] = $payment_method;
+       $data['pedido']['desc_pagamento'] = $payment_desc;
      }
 
      //Informações COmplementares ao Fisco
@@ -2193,7 +2243,6 @@ class WebmaniaBrNFe extends Module{
 
     }
 
-
     return $data;
 
   }
@@ -2373,6 +2422,8 @@ class WebmaniaBrNFe extends Module{
       'n_serie'      => (int) $response->serie,
       'url_xml'      => (string) $response->xml,
       'url_danfe'    => (string) $response->danfe,
+      'url_danfe_simplificada'    => (string) $response->danfe_simples,
+      'url_danfe_etiqueta'    => (string) $response->danfe_etiqueta,
       'data'         => date('d/m/Y'),
       );
 
@@ -3177,6 +3228,51 @@ class WebmaniaBrNFe extends Module{
 
     }
 
+  }
+
+  function get_nfe_urls($ids, $type) {
+
+    $directory = _PS_ROOT_DIR_.'/modules/webmaniabrnfe/pdf_files/';
+    if (!file_exists($directory)) {
+      mkdir($directory);
+    } 
+
+    $link_pdf = '';
+
+    $pdf = new PDFMerger();
+
+    foreach ($ids as $id) {
+      $nfe_info = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $id" ));
+
+      if (!$nfe_info) {
+        continue;
+      }
+
+      $data = end($nfe_info);
+      if ($data['status'] != 'aprovado') {
+        continue;
+      }
+
+      if ($type == 'normal') {
+        $url = $data['url_danfe'];
+      }
+      else if ($type == 'simples') {
+        $url = ($data['url_danfe_simplificada']) ? $data['url_danfe_simplificada'] : str_replace('/danfe/', '/danfe/simples/', $data['url_danfe']);
+      }
+      else if ($type == 'etiqueta') {
+        $url = ($data['url_danfe_etiqueta']) ? $data['url_danfe_etiqueta'] : str_replace('/danfe/', '/danfe/etiqueta/', $data['url_danfe']);
+      }
+
+      file_put_contents("{$directory}/{$data['chave_acesso']}.pdf", file_get_contents($url));
+			$pdf->addPDF("{$directory}/{$data['chave_acesso']}.pdf", 'all');
+    }
+
+    $filename = time()."-".random_int(1, 10000000000);
+		$result = $pdf->merge('file', "{$directory}/{$filename}.pdf");
+
+
+		return array("result" => $result, "file" => _PS_BASE_URL_.__PS_BASE_URI__."modules/webmaniabrnfe/pdf_files/{$filename}.pdf");
+    
   }
 
 }

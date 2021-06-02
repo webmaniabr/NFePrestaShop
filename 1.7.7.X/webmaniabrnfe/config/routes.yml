@@ -2,4 +2,22 @@ webmaniabrnfe_emitirnfe:
   path: webmaniabrnfe/emitirnfe
   methods: [POST]
   defaults:
-    _controller: 'webmaniabrnfe\Controller\EmitirNfeController::receiveBulkAction'
+    _controller: 'webmaniabrnfe\Controller\BulkActionsController::emitirNfe'
+
+webmaniabrnfe_imprimir_danfe:
+  path: webmaniabrnfe/imprimir_danfe
+  methods: [POST]
+  defaults:
+    _controller: 'webmaniabrnfe\Controller\BulkActionsController::imprimirDanfe'
+
+webmaniabrnfe_imprimir_danfe_simples:
+  path: webmaniabrnfe/imprimir_danfe_simples
+  methods: [POST]
+  defaults:
+    _controller: 'webmaniabrnfe\Controller\BulkActionsController::imprimirDanfe'
+
+webmaniabrnfe_imprimir_danfe_etiqueta:
+  path: webmaniabrnfe/imprimir_danfe_etiqueta
+  methods: [POST]
+  defaults:
+    _controller: 'webmaniabrnfe\Controller\BulkActionsController::imprimirDanfe'

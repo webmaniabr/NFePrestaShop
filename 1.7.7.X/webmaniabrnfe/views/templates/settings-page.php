@@ -193,8 +193,7 @@ if($carriers){
 
                </select>
             </div>
-         </div>
-         
+         </div>         
          
          <div class="form-group">
             <label class="control-label col-lg-3">
@@ -233,6 +232,43 @@ if($carriers){
       </div>
       <!-- /.form-wrapper -->
    </div>
+
+   <div class="panel" id="fieldset_2_1">
+      <div class="panel-heading">
+         Indicativo de intermediador
+      </div>
+      <div class="form-wrapper">
+         <div class="form-group">
+            <label class="control-label col-lg-3">
+            Intermediador da operação
+            </label>
+            <div class="col-lg-9">
+               <select name="webmaniabrnfeintermediador" class=" fixed-width-xl" id="webmaniabrnfeintermediador">
+                  <option value="00" <?php echo $fields_values[$this->name.'intermediador'] == '00' ? 'selected' : ''; ?>>0 - Operação sem intermediador (em site ou plataforma própria)</option>
+                  <option value="1" <?php echo $fields_values[$this->name.'intermediador'] == '1' ? 'selected' : ''; ?>>1 - Operação em site ou plataforma de terceiros (intermediadores/marketplace)</option>
+               </select>
+            </div>
+         </div>
+         <div class="form-group">
+            <label class="control-label col-lg-3">
+            CNPJ do Intermediador
+            </label>
+            <div class="col-lg-9">
+               <input type="text" name="webmaniabrnfeintermediador_cnpj" id="webmaniabrnfeintermediador_cnpj" value="<?php echo $fields_values[$this->name.'intermediador_cnpj']; ?>" class="" size="50">
+            </div>
+         </div>
+         <div class="form-group">
+            <label class="control-label col-lg-3">
+            ID do Intermediador
+            </label>
+            <div class="col-lg-9">
+               <input type="text" name="webmaniabrnfeintermediador_id" id="webmaniabrnfeintermediador_id" value="<?php echo $fields_values[$this->name.'intermediador_id']; ?>" class="" size="50">
+            </div>
+         </div>
+      </div>
+      <!-- /.form-wrapper -->
+   </div>
+
    <div class="panel" id="fieldset_2_2">
       <div class="panel-heading">
          Informações Complementares (Opcional)
@@ -387,6 +423,7 @@ if($carriers){
                   <thead>
                      <th>Método</th>
                      <th>Forma de Pagamento</th>
+                     <th class="payment-desc-title">Descrição do Pagamento</th>
                   </thead>
                   <tbody>
                      <?php 
@@ -394,12 +431,13 @@ if($carriers){
                         foreach($payment_methods as $method):
                            
                            $saved_value = Configuration::get('webmaniabrnfepayment_'.$method['value']);
+                           $saved_desc = Configuration::get('webmaniabrnfepayment_'.$method['value'].'_desc');
                            
                      ?>
                            <tr>
                               <td><?php echo $method['label']; ?></td>
                               <td>
-                                 <select style="max-width: 300px" name="webmaniabrnfepayment_<?php echo $method['value']; ?>">
+                                 <select style="max-width: 300px" class="webmaniabrnfepayment-methods-sel" name="webmaniabrnfepayment_<?php echo $method['value']; ?>">
                                     <option value="">Selecionar</option>
                                  <?php 
                                     $options = array(
@@ -431,6 +469,9 @@ if($carriers){
                         			
                         	        ?>
                         	        </select>
+                              </td>
+                              <td>
+                                 <input type="text" class="webmaniabrnfepayment-desc" name="webmaniabrnfepayment_<?php echo $method['value']; ?>_desc" value="<?php echo $saved_desc; ?>" style="<?php echo ($saved_value != '99') ? 'display:none;' : ''; ?>" />
                               </td>
                            </tr>
                            

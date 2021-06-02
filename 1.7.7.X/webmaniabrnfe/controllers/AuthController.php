@@ -5,7 +5,7 @@ class AuthController extends AuthControllerCore
     /*
     * module: webmaniabrnfe
     * date: 2016-07-14 09:00:00
-    * version: 2.8.4
+    * version: 2.9.0
     */
     public function process(){
       $document_type = Tools::getValue('document_type');
