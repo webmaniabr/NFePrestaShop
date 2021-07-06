@@ -114,8 +114,17 @@ jQuery(document).ready(function(){
       getBulkAction: function(){
 
         var action = "sendBulkAction($(this).closest('form').get(0), 'submitBulkemitirNfeorder');";
+        var action2 = "sendBulkAction($(this).closest('form').get(0), 'submitBulkimprimirDanfe');";
+        var action3 = "sendBulkAction($(this).closest('form').get(0), 'submitBulkimprimirDanfeSimples');";
+        var action4 = "sendBulkAction($(this).closest('form').get(0), 'submitBulkimprimirDanfeEtiqueta');";
         var $html = '<li><a href="#" id="emitirNfe" onclick="'+action+'"><i class="icon-file-text"></i> Emitir NF-e</a><input type="hidden" name="" value="update" /></li>';
+        $html += '<li><a href="#" id="imprimirDanfe" onclick="'+action2+'"><i class="icon-file-text"></i> Imprimir Danfe</a><input type="hidden" name="" value="update" /></li>';
+        $html += '<li><a href="#" id="imprimirDanfeSimples" onclick="'+action3+'"><i class="icon-file-text"></i> Imprimir Danfe Simples</a><input type="hidden" name="" value="update" /></li>';
+        $html += '<li><a href="#" id="imprimirDanfeEtiqueta" onclick="'+action4+'"><i class="icon-file-text"></i> Imprimir Danfe Etiqueta</a><input type="hidden" name="" value="update" /></li>';
         $html += '<input type="hidden" name="wmbr_bulk_action" value="emitirNfe" />';
+        $html += '<input type="hidden" name="wmbr_bulk_action" value="imprimirDanfe" />';
+        $html += '<input type="hidden" name="wmbr_bulk_action" value="imprimirDanfeSimples" />';
+        $html += '<input type="hidden" name="wmbr_bulk_action" value="imprimirDanfeEtiqueta" />';
 
         return $html;
 
@@ -410,6 +419,43 @@ jQuery(document).ready(function(){
       var bairro_status = $('input[name="webmaniabrnfebairro_status"]:checked').val();
       handleBairroStatus(bairro_status);
     });
+
+    $('input[name="webmaniabrnfeintermediador_cnpj').mask("99.999.999/9999-99");
+
+    update_payment_desc_label = function() {
+      
+      var descs_active = $('.webmaniabrnfepayment-desc').filter(function() { 
+        return $(this).css('display') !== 'none'; 
+      }).size();
+
+      if (descs_active > 0) {
+        $('.payment-desc-title').show();
+      }
+      else {
+        $('.payment-desc-title').hide();
+      } 
+
+    }
+
+    update_payment_desc_label();
+
+    // Show payment desc field if payment method is 99
+    $('.webmaniabrnfepayment-methods-sel').change(function(element) {
+			
+			var payment_desc = $(event.target).parent().parent().find('.webmaniabrnfepayment-desc');
+			
+			if (element.target.value == 99) {
+				$(payment_desc).show();
+        $('.payment-desc-title').show();
+			}
+			else {
+				$(payment_desc).val('');
+				$(payment_desc).hide();
+			}
+
+      update_payment_desc_label();
+			
+		});
 
   }
   
