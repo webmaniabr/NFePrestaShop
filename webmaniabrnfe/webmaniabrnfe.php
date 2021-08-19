@@ -22,7 +22,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.9.0';
+    $this->version = '2.9.1';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -92,7 +92,8 @@ class WebmaniaBrNFe extends Module{
       'displayAdminOrderTabLink',
       'displayAdminOrderTabContent',
       'displayAdminOrderTabShip',
-      'displayAdminOrderContentShip'
+      'displayAdminOrderContentShip',
+      'displayAdminCustomers'
     );
 
     //Additional hooks to version 1.7
@@ -116,6 +117,33 @@ class WebmaniaBrNFe extends Module{
     //Does not allow checkout as a guest 
     Configuration::updateValue('PS_GUEST_CHECKOUT_ENABLED', 0);
     return true;
+
+  }
+
+  /**
+   * Display new elements in the Back Office, tab AdminCustomers
+   * This hook launches modules when the AdminCustomers tab is displayed in the Back Office
+   * 
+   * @param array $customer
+   */
+  public function hookDisplayAdminCustomers(array $customer) {
+
+    $customer_id = $customer['id_customer'];
+
+    //Get customer info
+    $customer_info = Db::getInstance()->getRow("SELECT nfe_document_type, nfe_document_number, nfe_razao_social, nfe_pj_ie FROM "._DB_PREFIX_."customer WHERE id_customer = $customer_id" );
+
+    if (!$customer_info['nfe_document_type']) {
+      return '';
+    }
+
+    $this->context->smarty->assign(array(
+      'customer_info' => $customer_info,
+      'url' => $url
+    ));
+
+    //Customer info template
+    return (_MAIN_PS_VERSION_ <= 1.6) ? $this->display(__FILE__, 'customer_document_info.1.6.tpl') : $this->display(__FILE__, 'customer_document_info.1.7.tpl');
 
   }
 
