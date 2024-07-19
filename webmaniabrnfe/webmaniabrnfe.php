@@ -22,7 +22,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.9.1';
+    $this->version = '2.9.2';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -230,7 +230,8 @@ class WebmaniaBrNFe extends Module{
   public function hookDisplayAdminOrderTop($params) {
     
     $order_id = $params['id_order'];
-
+    $order = new Order($order_id);
+    $customer = $order->getCustomer();
     //Get order's nfe info
     $nfe_info = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $order_id" ));
 
@@ -250,6 +251,20 @@ class WebmaniaBrNFe extends Module{
         </div>
       ";
     }
+    $customer_docs = $this->getCustomerDocs($customer, $order);
+    $document = '';
+
+    if ($customer_docs['cnpj'] && $customer_docs['cnpj'] != $customer_docs['cpf'] || $this->is_cnpj($customer_docs['cpf'])){
+
+      $document = $this->cnpj($customer_docs['cnpj']);
+      if( !$document && isset($customer->cnpj) ) $document = $customer->cnpj;
+
+    } else {
+
+      $document = $this->cpf($customer_docs['cpf']);
+      if( !$document && isset($customer->cpf) ) $document = $customer->cpf;
+
+    }
 
     //Set danfe simples/etiqueta url if it doesn't exist
     foreach ($nfe_info as $key => $nfe) {
@@ -259,6 +274,21 @@ class WebmaniaBrNFe extends Module{
       if (!$nfe['url_danfe_etiqueta']) {
         $nfe_info[$key]['url_danfe_etiqueta'] = str_replace('/danfe/', '/danfe/etiqueta/', $nfe['url_danfe']);
       }
+      $password = !empty($nfe['documento']) ? $nfe['documento'] : $document;
+      if(!empty($password)){
+        $tokens = [
+          "danfe" => $this->createSecureTokenDFe($password, $nfe['uuid']),
+          "danfe_simples" => $this->createSecureTokenDFe($password, $nfe['uuid']),
+          "danfe_etiqueta" => $this->createSecureTokenDFe($password, $nfe['uuid']),
+          "xml" => $this->createSecureTokenDFe($password, $nfe['uuid']),
+        ];
+
+        $nfe_info[$key]['url_danfe'] .= '?token=' . $tokens['danfe'];
+        $nfe_info[$key]['url_danfe_simplificada'] .= '?token=' . $tokens['danfe_simples'];
+        $nfe_info[$key]['url_danfe_etiqueta'] .= '?token=' . $tokens['danfe_etiqueta'];
+        $nfe_info[$key]['url_xml'] .= '?token=' . $tokens['xml'];
+      }
+
     }
 
     if(Tools::getValue('nfe-transporte-info')){
@@ -1166,6 +1196,8 @@ class WebmaniaBrNFe extends Module{
   public function display_order_nfe_table($order_id){
 
     $order_id = (int) $order_id;
+    $order = new Order($order_id);
+    $customer = $order->getCustomer();
 
     $nfe_info = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $order_id" ));
 
@@ -1197,6 +1229,21 @@ class WebmaniaBrNFe extends Module{
         </style>';
       }
 
+      $customer_docs = $this->getCustomerDocs($customer, $order);
+      $document = '';
+
+      if ($customer_docs['cnpj'] && $customer_docs['cnpj'] != $customer_docs['cpf'] || $this->is_cnpj($customer_docs['cpf'])){
+
+        $document = $this->cnpj($customer_docs['cnpj']);
+        if( !$document && isset($customer->cnpj) ) $document = $customer->cnpj;
+
+      } else {
+
+        $document = $this->cpf($customer_docs['cpf']);
+        if( !$document && isset($customer->cpf) ) $document = $customer->cpf;
+
+      }
+
       //Set danfe simples/etiqueta url if it doesn't exist
       foreach ($nfe_info as $key => $nfe) {
         if (!$nfe['url_danfe_simplificada']) {
@@ -1205,6 +1252,21 @@ class WebmaniaBrNFe extends Module{
         if (!$nfe['url_danfe_etiqueta']) {
           $nfe_info[$key]['url_danfe_etiqueta'] = str_replace('/danfe/', '/danfe/etiqueta/', $nfe['url_danfe']);
         }
+        $password = !empty($nfe['documento']) ? $nfe['documento'] : $document;
+        if(!empty($password)){
+          $tokens = [
+            "danfe" => $this->createSecureTokenDFe($password, $nfe['uuid']),
+            "danfe_simples" => $this->createSecureTokenDFe($password, $nfe['uuid']),
+            "danfe_etiqueta" => $this->createSecureTokenDFe($password, $nfe['uuid']),
+            "xml" => $this->createSecureTokenDFe($password, $nfe['uuid']),
+          ];
+
+          $nfe_info[$key]['url_danfe'] .= '?token=' . $tokens['danfe'];
+          $nfe_info[$key]['url_danfe_simplificada'] .= '?token=' . $tokens['danfe_simples'];
+          $nfe_info[$key]['url_danfe_etiqueta'] .= '?token=' . $tokens['danfe_etiqueta'];
+          $nfe_info[$key]['url_xml'] .= '?token=' . $tokens['xml'];
+        }
+
       }
 
       $this->context->smarty->assign(array(
@@ -1214,7 +1276,6 @@ class WebmaniaBrNFe extends Module{
 
       echo  $this->display(__FILE__, 'nfe_info_table_1.6-1.7.tpl');
 
-      $order = new Order($order_id);
       $customer_id = $order->id_customer;
       $delivery_address_id = $order->id_address_delivery;
       $invoice_address_id = $order->id_address_invoice;
@@ -2007,96 +2068,15 @@ class WebmaniaBrNFe extends Module{
 
     // Get customer
     $customer = $order->getCustomer();
-    $customer_docs = array();
-
-    // Get Custom Fields
-    $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
+    $customer_docs = $this->getCustomerDocs($customer, $order);
     $number_status = Configuration::get($this->name.'numero_compl_status');
     $bairro_status = Configuration::get($this->name.'bairro_status');
-
-    if ($cpf_cnpj_status == 'on'){
-
-      $result = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
-
-      $customer_docs = array(
-        'cpf'          => $result['nfe_document_number'],
-        'cnpj'         => $result['nfe_document_number'],
-        'razao_social' => $result['nfe_razao_social'],
-        'ie'           => $result['nfe_pj_ie']
-      );
-
-    } else {
-
-      $customer_docs = array();
-
-      if(!Configuration::get($this->name.'docscolumn_cpf')){
-
-        $fields = array(
-          'cpf'            => Configuration::get($this->name.'cpf_field'),
-          'cnpj'           => Configuration::get($this->name.'cnpj_field'),
-          'razao_social'   => Configuration::get($this->name.'razao_social_field'),
-          'ie'             => Configuration::get($this->name.'cnpj_ie_field')
-        );
-
-        $address = new Address($order->id_address_delivery);
-        $customer_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
-        $address_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
-
-        if(isset($customer_custom[$fields['cpf']])) $customer_docs['cpf'] = $customer_custom[$fields['cpf']];
-        if(isset($customer_custom[$fields['cnpj']])) $customer_docs['cnpj'] = $customer_custom[$fields['cnpj']];
-        if(isset($customer_custom[$fields['razao_social']])) $customer_docs['razao_social'] = $customer_custom[$fields['razao_social']];
-        if(isset($customer_custom[$fields['ie']])) $customer_docs['ie'] = $customer_custom[$fields['ie']];
-
-        // Identify if customer custom fields is located in _address database
-        if (isset($address_custom[$fields['cpf']])) $customer_docs['cpf'] = $address_custom[$fields['cpf']];
-        if (isset($address_custom[$fields['cnpj']])) $customer_docs['cnpj'] = $address_custom[$fields['cnpj']];
-        if (isset($address_custom[$fields['razao_social']])) $customer_docs['razao_social'] = $address_custom[$fields['razao_social']];
-        if (isset($address_custom[$fields['ie']])) $customer_docs['ie'] = $address_custom[$fields['ie']];
-
-      }else{
-
-            $map = array(
-                'cpf' => array(
-                    'table'  => Configuration::get($this->name.'docstable_cpf'),
-                    'column' => Configuration::get($this->name.'docscolumn_cpf')
-                ),
-                'cnpj' => array(
-                    'table'  => Configuration::get($this->name.'docstable_cnpj'),
-                    'column' => Configuration::get($this->name.'docscolumn_cnpj')
-                ),
-                'razao_social' => array(
-                    'table'  => Configuration::get($this->name.'docstable_rs'),
-                    'column' => Configuration::get($this->name.'docscolumn_rs'),
-                ),
-                'ie' => array(
-                    'table'  => Configuration::get($this->name.'docstable_ie'),
-                    'column' => Configuration::get($this->name.'docscolumn_ie')
-                )
-            );
-
-            foreach($map as $key => $doc){
-
-                $table  = $doc['table'];
-                $column = $doc['column'];
-
-                if ($table != "" && $column != "" && $customer->id != ""){
-
-                    $query = "SELECT $column FROM $table WHERE id_customer = '$customer->id'";
-                    $val = Db::getInstance()->executeS($query);
-
-                    foreach ($val as $value) {
-                        $customer_docs[$key] = $value[$column];
-                    }
-
-                }
-
-            }
-
-        }
-
-    }
-
-
+    $fields = array(
+      'cpf'            => Configuration::get($this->name.'cpf_field'),
+      'cnpj'           => Configuration::get($this->name.'cnpj_field'),
+      'razao_social'   => Configuration::get($this->name.'razao_social_field'),
+      'ie'             => Configuration::get($this->name.'cnpj_ie_field')
+    );
     if ($number_status == 'on') $fields['address_number'] = 'address_number';
     else $fields['address_number'] = Configuration::get($this->name.'numero_field');
 
@@ -2108,7 +2088,7 @@ class WebmaniaBrNFe extends Module{
     $state = new State($address->id_state);
     $products = $order->getProducts();
 
-
+    $customer_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
     $address_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
 
     // Set Document Type
@@ -2569,6 +2549,7 @@ class WebmaniaBrNFe extends Module{
       'url_danfe'    => (string) $response->danfe,
       'url_danfe_simplificada'    => (string) $response->danfe_simples,
       'url_danfe_etiqueta'    => (string) $response->danfe_etiqueta,
+      'documento'    => (string) ($data['cliente']['cnpj'] ?? $data['cliente']['cpf'] ?? '' ),
       'data'         => date('d/m/Y'),
       );
 
@@ -2659,8 +2640,8 @@ class WebmaniaBrNFe extends Module{
       $values = Tools::getValue('orderBox');
       if (!empty($values)) {
         $result = $this->get_nfe_urls($values, 'normal');
-        if ($result['result']) {
-          Tools::redirectLink($result['file']);
+        if ($result['result'] && !empty($result['file']) && file_exists($result['file'])) {
+          $this->showDanfe($result['file'], $result['filename']);
         }
       }    
     }
@@ -2669,8 +2650,8 @@ class WebmaniaBrNFe extends Module{
       $values = Tools::getValue('orderBox');
       if (!empty($values)) {
         $result = $this->get_nfe_urls($values, 'simples');
-        if ($result['result']) {
-          Tools::redirectLink($result['file']);
+        if ($result['result'] && !empty($result['file']) && file_exists($result['file'])) {
+          $this->showDanfe($result['file'], $result['filename']);
         }
       }    
     }
@@ -2679,8 +2660,8 @@ class WebmaniaBrNFe extends Module{
       $values = Tools::getValue('orderBox');
       if (!empty($values)) {
         $result = $this->get_nfe_urls($values, 'etiqueta');
-        if ($result['result']) {
-          Tools::redirectLink($result['file']);
+        if ($result['result'] && !empty($result['file']) && file_exists($result['file'])) {
+          $this->showDanfe($result['file'], $result['filename']);
         }
       }    
     }
@@ -3418,6 +3399,7 @@ class WebmaniaBrNFe extends Module{
 
   function get_nfe_urls($ids, $type) {
 
+    $webmaniabr = new NFe($this->settings);
     $directory = _PS_ROOT_DIR_.'/modules/webmaniabrnfe/pdf_files/';
     if (!file_exists($directory)) {
       mkdir($directory);
@@ -3428,6 +3410,7 @@ class WebmaniaBrNFe extends Module{
     $pdf = new PDFMerger();
 
     $files = 0;
+    $paths_file_key = [];
     foreach ($ids as $id) {
       $nfe_info = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $id" ));
 
@@ -3449,17 +3432,147 @@ class WebmaniaBrNFe extends Module{
       else if ($type == 'etiqueta') {
         $url = ($data['url_danfe_etiqueta']) ? $data['url_danfe_etiqueta'] : str_replace('/danfe/', '/danfe/etiqueta/', $data['url_danfe']);
       }
-
-      file_put_contents("{$directory}/{$data['chave_acesso']}.pdf", file_get_contents($url));
-			$pdf->addPDF("{$directory}/{$data['chave_acesso']}.pdf", 'all');
+      $path_file_key = "{$directory}/{$data['chave_acesso']}.pdf";
+      file_put_contents($path_file_key, $webmaniabr->curl_get_file_contents($url));
+			$pdf->addPDF($path_file_key, 'all');
+      $paths_file_key[] = $path_file_key;
       $files++;
     }
 
-    $filename = time()."-".random_int(1, 10000000000);
-		$result = ($files > 0) ? $pdf->merge('file', "{$directory}/{$filename}.pdf") : false;
+    $filename = time()."-".random_int(1, 10000000000) . ".pdf";
+		$result = ($files > 0) ? $pdf->merge('file', $directory . $filename) : false;
 
-		return array("result" => $result, "file" => _PS_BASE_URL_.__PS_BASE_URI__."modules/webmaniabrnfe/pdf_files/{$filename}.pdf");
+    foreach($paths_file_key as $path_file_key){
+      if(file_exists($path_file_key)) unlink($path_file_key);
+    }
+
+		return array("result" => $result, "file" => $directory . $filename, "filename" => $filename);
     
   }
 
-}
+  public function showDanfe($file, $filename, $download = false){
+
+    header('Content-Type: application/pdf');
+    if($download) header("Content-Disposition: attachment; filename=$filename");
+    else header("Content-Disposition: inline; filename=$filename");
+    header('Content-Length: ' . filesize($file));
+    header('Pragma: no-cache');
+    header('Expires: 0');
+
+    ob_clean();
+    flush();
+    $handle = fopen($file, "rb");
+    while (!feof($handle)) {
+      echo fread($handle, 8192);
+      flush();
+    }
+    fclose($handle);
+
+    unlink($file);
+    die();
+
+  }
+
+  public function createSecureTokenDFe( $password, $uuid ){
+
+    $password = preg_replace("/[^0-9]/", '', $password);
+    $key = hash('sha256', $password . ':' . $uuid, true);
+    $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('AES-256-CBC'));
+    $encryptedData = openssl_encrypt(time(), 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);
+    $tokenData = json_encode(['data' => base64_encode($encryptedData), 'iv' => base64_encode($iv)]);
+    return urlencode(base64_encode($tokenData));
+
+  }
+
+  public function getCustomerDocs($customer, $order){
+
+    $customer_docs = array();
+    // Get Custom Fields
+    $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
+
+    if ($cpf_cnpj_status == 'on'){
+
+      $result = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
+
+      $customer_docs = array(
+        'cpf'          => $result['nfe_document_number'],
+        'cnpj'         => $result['nfe_document_number'],
+        'razao_social' => $result['nfe_razao_social'],
+        'ie'           => $result['nfe_pj_ie']
+      );
+
+    } else {
+
+      $customer_docs = array();
+
+      if(!Configuration::get($this->name.'docscolumn_cpf')){
+
+        $fields = array(
+          'cpf'            => Configuration::get($this->name.'cpf_field'),
+          'cnpj'           => Configuration::get($this->name.'cnpj_field'),
+          'razao_social'   => Configuration::get($this->name.'razao_social_field'),
+          'ie'             => Configuration::get($this->name.'cnpj_ie_field')
+        );
+
+        $address = new Address($order->id_address_delivery);
+        $customer_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
+        $address_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
+
+        if(isset($customer_custom[$fields['cpf']])) $customer_docs['cpf'] = $customer_custom[$fields['cpf']];
+        if(isset($customer_custom[$fields['cnpj']])) $customer_docs['cnpj'] = $customer_custom[$fields['cnpj']];
+        if(isset($customer_custom[$fields['razao_social']])) $customer_docs['razao_social'] = $customer_custom[$fields['razao_social']];
+        if(isset($customer_custom[$fields['ie']])) $customer_docs['ie'] = $customer_custom[$fields['ie']];
+
+        // Identify if customer custom fields is located in _address database
+        if (isset($address_custom[$fields['cpf']])) $customer_docs['cpf'] = $address_custom[$fields['cpf']];
+        if (isset($address_custom[$fields['cnpj']])) $customer_docs['cnpj'] = $address_custom[$fields['cnpj']];
+        if (isset($address_custom[$fields['razao_social']])) $customer_docs['razao_social'] = $address_custom[$fields['razao_social']];
+        if (isset($address_custom[$fields['ie']])) $customer_docs['ie'] = $address_custom[$fields['ie']];
+
+      }else{
+
+            $map = array(
+                'cpf' => array(
+                    'table'  => Configuration::get($this->name.'docstable_cpf'),
+                    'column' => Configuration::get($this->name.'docscolumn_cpf')
+                ),
+                'cnpj' => array(
+                    'table'  => Configuration::get($this->name.'docstable_cnpj'),
+                    'column' => Configuration::get($this->name.'docscolumn_cnpj')
+                ),
+                'razao_social' => array(
+                    'table'  => Configuration::get($this->name.'docstable_rs'),
+                    'column' => Configuration::get($this->name.'docscolumn_rs'),
+                ),
+                'ie' => array(
+                    'table'  => Configuration::get($this->name.'docstable_ie'),
+                    'column' => Configuration::get($this->name.'docscolumn_ie')
+                )
+            );
+
+            foreach($map as $key => $doc){
+
+                $table  = $doc['table'];
+                $column = $doc['column'];
+
+                if ($table != "" && $column != "" && $customer->id != ""){
+
+                    $query = "SELECT $column FROM $table WHERE id_customer = '$customer->id'";
+                    $val = Db::getInstance()->executeS($query);
+
+                    foreach ($val as $value) {
+                        $customer_docs[$key] = $value[$column];
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+
+    return $customer_docs;
+  }
+
+} 

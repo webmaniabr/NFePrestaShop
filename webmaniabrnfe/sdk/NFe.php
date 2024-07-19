@@ -158,5 +158,26 @@ class NFe {
 
     }
 
+    public function curl_get_file_contents($url) {
+
+      $headers = array(
+        'Cache-Control: no-cache',
+        'X-Consumer-Key: '.$this->consumerKey,
+        'X-Consumer-Secret: '.$this->consumerSecret,
+        'X-Access-Token: '.$this->accessToken,
+        'X-Access-Token-Secret: '.$this->accessTokenSecret
+      );
+
+      $c = curl_init();
+      curl_setopt($c, CURLOPT_RETURNTRANSFER, 1);
+      curl_setopt($c, CURLOPT_URL, $url);
+      curl_setopt($c, CURLOPT_HTTPHEADER, $headers);
+      $contents = curl_exec($c);
+      curl_close($c);
+
+      return $contents ?? false;
+
+    }
+
 }
 ?>

@@ -48,12 +48,12 @@ class BulkActionsController extends FrameworkBundleAdminController {
     $webmaniabrnfe = Module::getInstanceById($module_id);
     $response = $webmaniabrnfe->get_nfe_urls($ids, $type);
 
-    if ($response['result']) {
-      return $this->redirect($response['file']);
+    if (!$response['result'] || empty($response['file']) || !file_exists($response['file'])) {
+      return $this->redirect($this->getAdminLink('AdminOrders', array()));
     }
 
-    return $this->redirect($this->getAdminLink('AdminOrders', array()));
-
+    $webmaniabrnfe->showDanfe($response['file'], $response['filename'], true);
+  
   }
 
 }
