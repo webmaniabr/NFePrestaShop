@@ -3,16 +3,12 @@
 namespace webmaniabrnfe\Controller;
 
 use PrestaShopBundle\Controller\Admin\FrameworkBundleAdminController;
-use PrestaShop\PrestaShop\Adapter\Module\Module;
 
 class EmitirNfeController extends FrameworkBundleAdminController {
 
   public function receiveBulkAction() {
     $ids = $_POST['order_orders_bulk'];
-    $modules = Module::getModulesInstalled();
-    $key = array_search('webmaniabrnfe', array_column($modules, 'name'));
-    $module_id = $modules[$key]['id_module'];
-    $webmaniabrnfe = Module::getInstanceById($module_id);
+    $webmaniabrnfe = \Module::getInstanceByName('webmaniabrnfe');
 
     foreach ($ids as $id) {
       $responses = $webmaniabrnfe->emitirNfe($id);

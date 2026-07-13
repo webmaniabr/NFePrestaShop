@@ -39,7 +39,14 @@ class WebmaniaBRNFeView16ModuleFrontController extends ModuleFrontControllerCore
           ));
         }
 
-        $this->setTemplate('documents_view.1.6.tpl');
+        // PS 1.7/8/9 require the full "module:.../views/templates/front/..." path;
+        // the bare filename ("documents_view.1.6.tpl") throws "No template found".
+        // Keep the legacy bare name on 1.6 and older.
+        if (version_compare(_PS_VERSION_, '1.7', '>=')) {
+            $this->setTemplate('module:webmaniabrnfe/views/templates/front/documents_view.1.6.tpl');
+        } else {
+            $this->setTemplate('documents_view.1.6.tpl');
+        }
     }
 
   public function postProcess(){
