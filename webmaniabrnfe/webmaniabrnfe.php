@@ -6,7 +6,14 @@ if(!defined('_PS_VERSION_')){
 
 //Define main version
 if(!defined('_MAIN_PS_VERSION_')) {
-  define('_MAIN_PS_VERSION_', substr(_PS_VERSION_, 0, 3));
+  // PrestaShop 8/9 share the same hook/template/FormField API surface as 1.7
+  // for this module, so map any version >= 1.7 to '1.7'. This keeps every
+  // "1.7" code branch active on PS 8/9 instead of falling into dead paths.
+  if (version_compare(_PS_VERSION_, '1.7', '>=')) {
+    define('_MAIN_PS_VERSION_', '1.7');
+  } else {
+    define('_MAIN_PS_VERSION_', substr(_PS_VERSION_, 0, 3));
+  }
 }
 
 //Webmania SDK to issue invoices
@@ -22,7 +29,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.9.2';
+    $this->version = '2.9.3';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -139,11 +146,11 @@ class WebmaniaBrNFe extends Module{
 
     $this->context->smarty->assign(array(
       'customer_info' => $customer_info,
-      'url' => $url
+      'url' => ''
     ));
 
-    //Customer info template
-    return (_MAIN_PS_VERSION_ <= 1.6) ? $this->display(__FILE__, 'customer_document_info.1.6.tpl') : $this->display(__FILE__, 'customer_document_info.1.7.tpl');
+    //Customer info template (1.6 layout for <=1.6, 1.7 layout for 1.7/8/9)
+    return version_compare(_PS_VERSION_, '1.7', '<') ? $this->display(__FILE__, 'customer_document_info.1.6.tpl') : $this->display(__FILE__, 'customer_document_info.1.7.tpl');
 
   }
 
@@ -1064,7 +1071,12 @@ class WebmaniaBrNFe extends Module{
 
     if(_MAIN_PS_VERSION_ == '1.6' || _MAIN_PS_VERSION_ == '1.7'){
       $controller_name = $this->context->controller->controller_name;
-      $this->context->controller->addJquery();
+      // jQuery ships by default in the PS 8/9 back office and the legacy
+      // controller proxy no longer exposes addJquery(); guard the call so it
+      // still works on 1.6/1.7 without fataling on 8/9.
+      if(method_exists($this->context->controller, 'addJquery')){
+        $this->context->controller->addJquery();
+      }
       if($controller_name == 'AdminCustomers' || $controller_name == 'AdminModules'){
         $this->context->controller->addJS($this->_path.'/js/jquery.mask.min.js', 'all');
       }
@@ -1072,35 +1084,73 @@ class WebmaniaBrNFe extends Module{
       $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
       $numero_enabled = Configuration::get($this->name.'numero_compl_status');
 
-      if(Tools::getValue('id_customer')){
-        Media::addJsDef(array('id_customer_wmbr' => Tools::getValue('id_customer')));
+      // PS 1.6/1.7 passed the id as ?id_customer / ?id_address; PS 8/9 puts it
+      // in the Symfony route (/sell/customers/{customerId}/edit), exposed via
+      // Tools::getValue('customerId') / 'addressId'. Try both.
+      $edit_id_customer = Tools::getValue('id_customer') ?: Tools::getValue('customerId');
+      if($edit_id_customer){
+        Media::addJsDef(array('id_customer_wmbr' => $edit_id_customer));
+
+        // PS 8/9 ships modules/.htaccess with "Require all denied" for *.php,
+        // so the legacy direct call to ajax.php (checkForDoc) returns 403 and
+        // the CPF/CNPJ never prefills on edit. The data is already available
+        // server-side here, so inject it directly and skip the blocked AJAX.
+        $doc = Db::getInstance()->getRow('SELECT nfe_document_number, nfe_document_type, nfe_razao_social, nfe_pj_ie FROM '._DB_PREFIX_.'customer WHERE id_customer = '.(int)$edit_id_customer);
+        if($doc && !empty($doc['nfe_document_number'])){
+          Media::addJsDef(array('customer_doc_wmbr' => array(
+            'document_number' => $doc['nfe_document_number'],
+            'document_type'   => $doc['nfe_document_type'],
+            'razao_social'    => $doc['nfe_razao_social'],
+            'ie'              => $doc['nfe_pj_ie'],
+          )));
+        }
       }
 
-      if(Tools::getValue('id_address')){
-        Media::addJsDef(array('id_address_wmbr' => Tools::getValue('id_address')));
+      $edit_id_address = Tools::getValue('id_address') ?: Tools::getValue('addressId');
+      if($edit_id_address){
+        Media::addJsDef(array('id_address_wmbr' => $edit_id_address));
+
+        // Same 403 issue as the customer doc: ajax.php (getAddressInfo) is
+        // blocked by modules/.htaccess on PS 8/9, so the address number never
+        // prefills on edit. Inject it server-side and skip the blocked AJAX.
+        $addr = Db::getInstance()->getRow('SELECT address_number, bairro FROM '._DB_PREFIX_.'address WHERE id_address = '.(int)$edit_id_address);
+        if($addr){
+          Media::addJsDef(array('address_doc_wmbr' => array(
+            'address_number' => $addr['address_number'],
+            'bairro'         => $addr['bairro'],
+          )));
+        }
       }
 
 
       Media::addJsDef(array('tipo_pessoa_enabled' => $cpf_cnpj_status));
       Media::addJsDef(array('numero_enabled' => $numero_enabled));
 
+      // Absolute module base URL so back-office JS can load assets without
+      // relying on a relative "../modules/..." path (which resolves to a
+      // non-existent Symfony route on PS 8/9 and 404s).
+      Media::addJsDef(array('wmbr_module_path' => __PS_BASE_URI__.'modules/'.$this->name.'/'));
+
       Media::addJsDef(array('sec_token' => Tools::getAdminToken('7Br2ZZwaRD')));
 
+      // Append the module version as a cache-buster: PS serves these JS files
+      // without a version query string, so browsers hold a stale copy across
+      // module updates. Bumping $this->version forces a fresh fetch.
       if (_PS_VERSION_ >= '1.7.7') {
-        $this->context->controller->addJS($this->_path.'/js/scripts_bo.1.7.7.js', 'all');
+        $this->context->controller->addJS($this->_path.'/js/scripts_bo.1.7.7.js?v='.$this->version, 'all');
       }
       else {
-        $this->context->controller->addJS($this->_path.'/js/scripts_bo.1.6-1.7.js', 'all');
+        $this->context->controller->addJS($this->_path.'/js/scripts_bo.1.6-1.7.js?v='.$this->version, 'all');
       }
-      
-      $this->context->controller->addCSS($this->_path.'/views/css/style.css', 'all');
+
+      $this->context->controller->addCSS($this->_path.'/views/css/style.css?v='.$this->version, 'all');
     }
 
     //Support to PS 1.5
     if(_MAIN_PS_VERSION_ == '1.5'){
       $this->rearrangeStates();
       $controllerName = $this->context->controller->controller_name;
-      if(($controllerName == 'AdminOrders' && !Tools::getValue('id_order')) || $controllerName = 'AdminCustomers' || $controllerName = 'AdminAddresses'){
+      if(($controllerName == 'AdminOrders' && !Tools::getValue('id_order')) || $controllerName == 'AdminCustomers' || $controllerName == 'AdminAddresses'){
         $this->context->controller->addJS($this->_path.'/js/scripts_bo.1.5.js', 'all');
         $this->context->controller->addJS($this->_path.'/js/jquery.mask.min.js', 'all');
         $this->context->controller->addCSS($this->_path.'/views/css/style.css', 'all');
@@ -1317,7 +1367,7 @@ class WebmaniaBrNFe extends Module{
       'nfe_peso_liquido' => pSQL(Tools::getValue('nfe_peso_liquido')),
       'nfe_valor_seguro' => pSQL(Tools::getValue('nfe_valor_seguro')),
     ),'id_order = ' .$order_id )){
-      $this->context->controller->_errors[] = 'Error: '.mysql_error();
+      $this->context->controller->_errors[] = 'Error: '.Db::getInstance()->getMsgError();
     }
 
   }
@@ -1470,7 +1520,7 @@ class WebmaniaBrNFe extends Module{
       'nfe_product_source' => pSQL(Tools::getValue('nfe_product_source')),
       'nfe_ignorar_nfe' => pSQL(Tools::getValue('nfe_ignorar_nfe'))
     ),'id_product = ' .$id_product )){
-      $this->context->controller->_errors[] = 'Error: '.mysql_error();
+      $this->context->controller->_errors[] = 'Error: '.Db::getInstance()->getMsgError();
     }
 
   }
@@ -1495,7 +1545,7 @@ class WebmaniaBrNFe extends Module{
     }
 
     if(!Db::getInstance()->update('customer', $DB_data, 'id_customer = ' .$customer_id )){
-      $this->context->controller->_errors[] = 'Error: '.mysql_error();
+      $this->context->controller->_errors[] = 'Error: '.Db::getInstance()->getMsgError();
     }
 
   }
@@ -1745,7 +1795,8 @@ class WebmaniaBrNFe extends Module{
         return $this->display(__FILE__, 'account_list_item.1.5.tpl');
       }
 
-      if(_MAIN_PS_VERSION_ == '1.6'){
+      // 1.6 and 1.7/8/9 share the same account list item template + view16 link
+      if(_MAIN_PS_VERSION_ == '1.6' || _MAIN_PS_VERSION_ == '1.7'){
 
         if($cpf_cnpj_status == 'on'){
           $redirect_url = $this->context->link->getModuleLink('webmaniabrnfe','view16');
@@ -1831,7 +1882,6 @@ class WebmaniaBrNFe extends Module{
 
     $number_status = Configuration::get($this->name.'numero_compl_status');
     $update_values = array();
-    $context_type = Context::getContext()->controller->controller_type;
 
     if($number_status == 'on'){
       $number = Tools::getValue('address_number');
@@ -1896,7 +1946,6 @@ class WebmaniaBrNFe extends Module{
 
     $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
     $update_values = array();
-    $context_type = Context::getContext()->controller->controller_type;
 
     if ($cpf_cnpj_status == 'on'){
       $fields = array(
@@ -2046,7 +2095,7 @@ class WebmaniaBrNFe extends Module{
 
     $order = new Order($orderID);
 
-    $discounts = $order->getDiscounts(true);
+    $discounts = $order->getCartRules();
     $discounts_applied = array(); // Only percentage
 
     $envio_email = Configuration::get($this->name.'envio_email');
@@ -2939,18 +2988,20 @@ class WebmaniaBrNFe extends Module{
 
 		$j = 5;
 		$k = 6;
-		$soma1 = "";
-		$soma2 = "";
+		// PHP 8: "" + int throws "Unsupported operand types: string + int".
+		// PHP 7 silently coerced "" to 0; init as int so the checksum still sums.
+		$soma1 = 0;
+		$soma2 = 0;
 
 		for ($i = 0; $i < 13; $i++) {
 
 			$j = $j == 1 ? 9 : $j;
 			$k = $k == 1 ? 9 : $k;
 
-			$soma2 += ($cnpj{$i} * $k);
+			$soma2 += ($cnpj[$i] * $k);
 
 			if ($i < 12) {
-				$soma1 += ($cnpj{$i} * $j);
+				$soma1 += ($cnpj[$i] * $j);
 			}
 
 			$k--;
@@ -2961,7 +3012,7 @@ class WebmaniaBrNFe extends Module{
 		$digito1 = $soma1 % 11 < 2 ? 0 : 11 - $soma1 % 11;
 		$digito2 = $soma2 % 11 < 2 ? 0 : 11 - $soma2 % 11;
 
-		return (($cnpj{12} == $digito1) and ($cnpj{13} == $digito2));
+		return (($cnpj[12] == $digito1) and ($cnpj[13] == $digito2));
 
     }
   }
