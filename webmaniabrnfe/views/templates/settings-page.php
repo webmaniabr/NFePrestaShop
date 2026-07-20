@@ -95,6 +95,15 @@ if($carriers){
          </div>
          <div class="form-group">
             <label class="control-label col-lg-3">
+            Status para emissão automática
+            </label>
+            <div class="col-lg-9">
+               <input type="text" name="webmaniabrnfeauto_emit_status_ids" id="webmaniabrnfeauto_emit_status_ids" value="<?php echo $fields_values[$this->name.'auto_emit_status_ids']; ?>" class="" size="50" placeholder="Ex.: 3,4,5">
+               <p class="help-block">Lista de IDs de status de pedido que disparam a emissão automática (separados por vírgula).</p>
+            </div>
+         </div>
+         <div class="form-group">
+            <label class="control-label col-lg-3">
             Envio automático de email
             
             </label>

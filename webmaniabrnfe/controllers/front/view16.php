@@ -39,7 +39,11 @@ class WebmaniaBRNFeView16ModuleFrontController extends ModuleFrontControllerCore
           ));
         }
 
-        $this->setTemplate('documents_view.1.6.tpl');
+        if (version_compare(_PS_VERSION_, '1.7', '>=')) {
+            $this->setTemplate('module:webmaniabrnfe/views/templates/front/documents_view.1.6.tpl');
+        } else {
+            $this->setTemplate('documents_view.1.6.tpl');
+        }
     }
 
   public function postProcess(){

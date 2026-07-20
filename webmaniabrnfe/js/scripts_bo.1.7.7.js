@@ -1,12 +1,16 @@
 jQuery(document).ready(function(){
 
+  var wmbrAjaxUrl = (typeof wmbr_module_path != 'undefined')
+    ? wmbr_module_path + 'ajax.php'
+    : '../modules/webmaniabrnfe/ajax.php';
+
   var WMBRBackOfficeController = {
 
     pages: {
 
       isCustomerPage: function() {
 
-        if($('#customer_form').length > 0){
+        if($('#customer_form').length > 0 || $('form[name="customer"]').length > 0){
           return true;
         }
 
@@ -16,7 +20,7 @@ jQuery(document).ready(function(){
 
       isAddressPage: function() {
 
-        if($('#address_form').length > 0){
+        if($('#address_form').length > 0 || $('form[name="customer_address"]').length > 0){
           return true;
         }
 
@@ -91,10 +95,15 @@ jQuery(document).ready(function(){
 
     html: {
 
-      getTipoPessoa: function() {
+      getTipoPessoa: function(onLoaded) {
 
         var $html =  $('<div></div>');
-        $html.load('../modules/webmaniabrnfe/assets/templates/docs.html');
+        var docsUrl = (typeof wmbr_module_path != 'undefined')
+          ? wmbr_module_path + 'assets/templates/docs.html'
+          : '../modules/webmaniabrnfe/assets/templates/docs.html';
+        // onLoaded runs after docs.html finishes loading (async), when the
+        // CPF/CNPJ inputs exist in the DOM.
+        $html.load(docsUrl, onLoaded);
 
         return $html;
 
@@ -102,9 +111,9 @@ jQuery(document).ready(function(){
 
       getNumero: function() {
 
-        var addrNumber = $('<div class="form-group number">'+
-                              '<label class="control-label col-lg-3 required"> Número</label>'+
-                              '<div class="col-lg-2"><input type="text" class="form-control" name="address_number" /></div>'+
+        var addrNumber = $('<div class="form-group row number">'+
+                              '<label class="form-control-label required">Número</label>'+
+                              '<div class="col-sm input-container"><input type="text" class="form-control" name="address_number" /></div>'+
                             '</div>');
 
         return addrNumber;
@@ -126,8 +135,20 @@ jQuery(document).ready(function(){
 
       insertTipoPessoa: function() {
 
-        var html = WMBRBackOfficeController.html.getTipoPessoa();
-        var referenceElement = $('input[name="firstname"]').parents('.form-group');
+        var html = WMBRBackOfficeController.html.getTipoPessoa(function(){
+          WMBRBackOfficeController.eventsHandler.initTipoPessoa();
+          if(WMBRBackOfficeController.pages.isEditCustomerPage()){
+            WMBRBackOfficeController.ajax.getDocuments();
+          }
+        });
+        var $anchor = $('input[name="firstname"]');
+        if($anchor.length === 0){
+          $anchor = $('input[name="customer[first_name]"], #customer_first_name');
+        }
+        var referenceElement = $anchor.parents('.form-group');
+        if(referenceElement.length === 0){
+          referenceElement = $anchor.closest('.form-group, .form-group-row, .row');
+        }
 
         $(html).insertBefore(referenceElement);
 
@@ -136,8 +157,13 @@ jQuery(document).ready(function(){
       insertNumero: function(){
 
         var html = WMBRBackOfficeController.html.getNumero();
-        html.insertAfter($('#address1').parents('.form-group'));
-        if($('#address1').length == 0){
+        var $addr1 = $('#address1');
+        if($addr1.length === 0){
+          $addr1 = $('#customer_address_address1, input[name="customer_address[address1]"]');
+        }
+        if($addr1.length > 0){
+          html.insertAfter($addr1.parents('.form-group'));
+        } else {
           html.insertAfter($('#address').parents('.form-group'));
         }
 
@@ -154,27 +180,36 @@ jQuery(document).ready(function(){
 
     ajax: {
 
+      applyDocument: function(doc){
+        if(!doc || typeof doc.document_type == 'undefined') return;
+        $('input[name="document_type"][value="'+doc.document_type+'"]').prop('checked', true).trigger('change');
+        $('input[name="'+doc.document_type+'"]').val(doc.document_number);
+        if(doc.document_type == 'cnpj'){
+          $('input[name="razao_social"]').val(doc.razao_social);
+          $('input[name="cnpj_ie"]').val(doc.ie);
+        }
+      },
+
       getDocuments: function(){
+
+        // Prefer the document injected server-side; fall back to AJAX on 1.6/1.7.
+        if(typeof customer_doc_wmbr != 'undefined'){
+          WMBRBackOfficeController.ajax.applyDocument(customer_doc_wmbr);
+          return;
+        }
 
         var id_customer = id_customer_wmbr;
         $.ajax({
           type: 'POST',
-          url: '../modules/webmaniabrnfe/ajax.php',
+          url: wmbrAjaxUrl,
           data: {
             method: 'checkForDoc',
             adminToken: sec_token,
             id_customer: id_customer,
           },
           success: function(json) {
-            console.log(json);
-            result = $.parseJSON(json);
-
-            if(typeof result.document_type != 'undefined'){
-              $('input[value="'+result.document_type+'"]').prop('checked', true).trigger('change');
-              $('input[name="'+result.document_type+'"]').val(result.document_number);
-              $('input[name="razao_social"]').val(result.razao_social);
-              $('input[name="nfe_pj_ie"]').val(result.nfe_pj_ie);
-            }
+            var doc = $.parseJSON(json);
+            WMBRBackOfficeController.ajax.applyDocument(doc);
           }
         });
 
@@ -182,11 +217,19 @@ jQuery(document).ready(function(){
 
       getAddressNumber: function(){
 
+        // Prefer the number injected server-side; fall back to AJAX on 1.6/1.7.
+        if(typeof address_doc_wmbr != 'undefined'){
+          if(typeof address_doc_wmbr.address_number != 'undefined'){
+            $('input[name="address_number"]').val(address_doc_wmbr.address_number);
+          }
+          return;
+        }
+
         var address_id = id_address_wmbr;
         $.ajax({
 
           type: 'POST',
-          url: '../modules/webmaniabrnfe/ajax.php',
+          url: wmbrAjaxUrl,
           data: {
             method: 'getAddressInfo',
             addressID: address_id,
@@ -213,10 +256,6 @@ jQuery(document).ready(function(){
         $(document).on('click', '#emitirNfe', WMBRBackOfficeController.eventsHandler.emitirBulkAction);
         $(document).on('change', 'input[name="document_type"]', WMBRBackOfficeController.eventsHandler.changeTipoPessoa);
 
-        if(WMBRBackOfficeController.pages.isEditCustomerPage()){
-          WMBRBackOfficeController.eventsHandler.initTipoPessoa();
-        }
-
       }
 
     },
@@ -238,6 +277,9 @@ jQuery(document).ready(function(){
             $('#cnpj-field').fadeToggle('fast', 'swing', function(){
               if(!$('#cpf-field').hasClass('active')){
                 $('#cpf-field').fadeToggle('fast').addClass('active');
+                // re-apply the mask once the field is visible (jQuery Mask does
+                // not bind on a display:none input)
+                $('input[name="cpf"]').mask('999.999.999-99');
               }
             }).removeClass('active');
           }
@@ -246,6 +288,8 @@ jQuery(document).ready(function(){
           if($('#cpf-field').hasClass('active')){
             $('#cpf-field').fadeToggle('fast', 'swing', function(){
               $('#cnpj-field').fadeToggle('fast').addClass('active');
+              // re-apply the mask once the field is visible
+              $('input[name="cnpj"]').mask('99.999.999/9999-99');
             }).removeClass('active');
           }
 
@@ -269,8 +313,8 @@ jQuery(document).ready(function(){
           });
         }
 
-        $('#cpf').mask('999.999.999-99');
-        $('#cnpj').mask('99.999.999/9999-99');
+        $('input[name="cpf"]').mask('999.999.999-99');
+        $('input[name="cnpj"]').mask('99.999.999/9999-99');
 
       }
     },
@@ -281,12 +325,8 @@ jQuery(document).ready(function(){
       this.events.init();
 
       if(this.pages.isCustomerPage()){
-        
-        if (tipo_pessoa_enabled == 'on') this.DOM.insertTipoPessoa();
 
-        if(this.pages.isEditCustomerPage()){
-          this.ajax.getDocuments();
-        }
+        if (tipo_pessoa_enabled == 'on') this.DOM.insertTipoPessoa();
 
       }
 
@@ -333,8 +373,12 @@ jQuery(document).ready(function(){
   WMBRBackOfficeController.init();
 
 
-  if($('#address2').length > 0){
-    $('#address2').parents('.form-group').find('label').addClass('required').html('Bairro');
+  var $address2 = $('#address2');
+  if($address2.length === 0){
+    $address2 = $('#customer_address_address2, input[name="customer_address[address2]"]');
+  }
+  if($address2.length > 0){
+    $address2.parents('.form-group').find('label').addClass('required').html('Bairro');
   }
 
 
@@ -489,7 +533,7 @@ jQuery(document).ready(function(){
     $.ajax({
 
       type: 'POST',
-      url: '../modules/webmaniabrnfe/ajax.php',
+      url: wmbrAjaxUrl,
       data: {
         method: 'getPSColumns',
         table_name: table_name,
