@@ -6,14 +6,14 @@
 
 Através do emissor de Nota Fiscal da Webmania®, você conta com a emissão e arquivamento das suas notas fiscais, cálculo automático de impostos, geração do Danfe para impressão e envio automático de e-mails para os clientes.
 
-- **Módulo compatível com as versões 1.6 e 1.7**
+- **Módulo compatível com as versões 1.6, 1.7, 8.0 e 9.0** (compatibilidade dinâmica: suporta futuras subversões)
 - **Faça download da última versão do módulo: [Clique aqui](https://github.com/webmaniabr/NFePrestaShop/releases)**
 - Emissor de Nota Fiscal Webmania®: [Saiba mais](https://webmaniabr.com/nota-fiscal-eletronica/)
 - Documentação da REST API: [Visualizar](https://webmaniabr.com/docs/rest-api-nfe/)
 
 ## Requisitos
 
-- Contrate um dos planos de Nota Fiscal Eletrônica da Webmania®: [Assine agora mesmo](https://webmaniabr.com/nota-fiscal-eletronica/#plans-section).
+- Contrate um dos planos de Nota Fiscal Eletrônica da Webmania®: [Assine agora mesmo](https://webmaniabr.com/nota-fiscal-eletronica/).
 - Instale o módulo grátis do PrestaShop da Webmania® e configure conforme instruções.
 
 ## Instalação
@@ -49,6 +49,12 @@ Consulte o nosso guia passo a passo para começar a emitir as notas fiscais com 
 - [Configurar credenciais](https://ajuda.webmaniabr.com/hc/pt-br/articles/360013116872-Configurar-credenciais-no-PrestaShop-1-7)
 - [Configurar impostos](https://ajuda.webmaniabr.com/hc/pt-br/articles/360013122332-Configurar-impostos-no-PrestaShop-1-7)
 - [Emitir Nota Fiscal](https://ajuda.webmaniabr.com/hc/pt-br/articles/360013383592-Emiss%C3%A3o-de-NF-e-no-PrestaShop-1-7)
+
+**PrestaShop 8.0 e 9.0**
+- Compatibilidade total com as novas versões do PrestaShop
+- Suporte a novos hooks e funcionalidades
+- Interface atualizada para o novo painel administrativo
+- Mantém compatibilidade reversa com versões anteriores
 
 ## Campos Obrigatórios
 

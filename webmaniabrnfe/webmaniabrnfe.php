@@ -6,7 +6,11 @@ if(!defined('_PS_VERSION_')){
 
 //Define main version
 if(!defined('_MAIN_PS_VERSION_')) {
-  define('_MAIN_PS_VERSION_', substr(_PS_VERSION_, 0, 3));
+  if (version_compare(_PS_VERSION_, '1.7', '>=')) {
+    define('_MAIN_PS_VERSION_', '1.7');
+  } else {
+    define('_MAIN_PS_VERSION_', substr(_PS_VERSION_, 0, 3));
+  }
 }
 
 //Webmania SDK to issue invoices
@@ -22,7 +26,7 @@ class WebmaniaBrNFe extends Module{
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '2.9.2';
+    $this->version = '3.0.1';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -52,6 +56,64 @@ class WebmaniaBrNFe extends Module{
     $this->description = $this->l('Módulo de emissão de Nota Fiscal Eletrônica para PrestaShop através da REST API da WebmaniaBR®.');
     $this->confirmUninstall = $this->l('Tem certeza que deseja desinstalar este módulo?');
 
+  }
+
+  /**
+   * Get PrestaShop version for compatibility checks
+   * @return string
+   */
+  public function getPrestaShopVersion() {
+    return defined('_PS_VERSION_') ? _PS_VERSION_ : '1.6.0.0';
+  }
+
+  /**
+   * Check if running on modern PrestaShop (8+)
+   * @return bool
+   */
+  public function isModernPrestaShop() {
+    return version_compare($this->getPrestaShopVersion(), '8.0.0', '>=');
+  }
+
+  /**
+   * Check if running on PrestaShop 8+
+   * @return bool
+   */
+  public function isPrestaShop8Plus() {
+    return version_compare($this->getPrestaShopVersion(), '8.0.0', '>=');
+  }
+
+  /**
+   * Check if running on PrestaShop 9+
+   * @return bool
+   */
+  public function isPrestaShop9Plus() {
+    return version_compare($this->getPrestaShopVersion(), '9.0.0', '>=');
+  }
+
+  /**
+   * Format price with compatibility for different PS versions
+   * @param float $price
+   * @param Currency|null $currency
+   * @return string
+   */
+  public function formatPriceCompatible($price, $currency = null) {
+    if (method_exists($this->context, 'getCurrentLocale') && $this->isPrestaShop8Plus()) {
+      $iso = $currency ? $currency->iso_code : ($this->context->currency ? $this->context->currency->iso_code : null);
+      return $this->context->getCurrentLocale()->formatPrice($price, $iso);
+    }
+    return Tools::displayPrice($price, $currency ?: $this->context->currency);
+  }
+
+  /**
+   * Get admin token with compatibility
+   * @param string $controller
+   * @return string
+   */
+  public function getAdminTokenCompatible($controller) {
+    if (class_exists('Tools') && method_exists('Tools', 'getAdminTokenLite')) {
+      return Tools::getAdminTokenLite($controller);
+    }
+    return Tools::getAdminToken($controller.(int)Tab::getIdFromClassName($controller).(int)$this->context->employee->id);
   }
 
   public function install(){
@@ -96,10 +158,28 @@ class WebmaniaBrNFe extends Module{
       'displayAdminCustomers'
     );
 
-    //Additional hooks to version 1.7
-    if(_MAIN_PS_VERSION_ == '1.7'){
+    //Additional hooks for version 1.7+
+    if(_MAIN_PS_VERSION_ == '1.7' || $this->isPrestaShop8Plus()){
       $hooks_main[] = 'additionalCustomerFormFields';
       $hooks_main[] = 'validateCustomerFormFields';
+    }
+
+    //Additional hooks for PrestaShop 8+
+    if($this->isPrestaShop8Plus()) {
+      $hooks_main[] = 'actionFrontControllerSetMedia';
+      $hooks_main[] = 'actionAdminControllerSetMedia';
+      $hooks_main[] = 'displayAdminOrderMain';
+    }
+
+    // Order status post update available since PS 1.7.7+
+    if (version_compare($this->getPrestaShopVersion(), '1.7.7.0', '>=')) {
+      $hooks_main[] = 'actionOrderStatusPostUpdate';
+    }
+
+    //Additional hooks for PrestaShop 9+  
+    if($this->isPrestaShop9Plus()) {
+      $hooks_main[] = 'displayAdminOrderMainBottom';
+      $hooks_main[] = 'actionValidateOrderAfter';
     }
 
     //Installation failed
@@ -908,6 +988,7 @@ class WebmaniaBrNFe extends Module{
       $this->name.'access_token_secret' => Configuration::get($this->name.'access_token_secret'),
       $this->name.'sefaz_env' => Configuration::get($this->name.'sefaz_env'),
       $this->name.'automatic_emit' => Configuration::get($this->name.'automatic_emit'),
+      $this->name.'auto_emit_status_ids' => Configuration::get($this->name.'auto_emit_status_ids'),
       $this->name.'operation_type' => Configuration::get($this->name.'operation_type'),
       $this->name.'tax_class' => Configuration::get($this->name.'tax_class'),
       $this->name.'ean_barcode'     => Configuration::get($this->name.'ean_barcode'),
@@ -975,6 +1056,7 @@ class WebmaniaBrNFe extends Module{
       $this->name.'access_token_secret' => '',
       $this->name.'sefaz_env' => '2',
       $this->name.'automatic_emit' => 'off',
+      $this->name.'auto_emit_status_ids' => '3,4,5',
       $this->name.'operation_type' => '',
       $this->name.'tax_class' => '',
       $this->name.'ean_barcode' => '',
@@ -1064,7 +1146,9 @@ class WebmaniaBrNFe extends Module{
 
     if(_MAIN_PS_VERSION_ == '1.6' || _MAIN_PS_VERSION_ == '1.7'){
       $controller_name = $this->context->controller->controller_name;
-      $this->context->controller->addJquery();
+      if(method_exists($this->context->controller, 'addJquery')){
+        $this->context->controller->addJquery();
+      }
       if($controller_name == 'AdminCustomers' || $controller_name == 'AdminModules'){
         $this->context->controller->addJS($this->_path.'/js/jquery.mask.min.js', 'all');
       }
@@ -1072,35 +1156,57 @@ class WebmaniaBrNFe extends Module{
       $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
       $numero_enabled = Configuration::get($this->name.'numero_compl_status');
 
-      if(Tools::getValue('id_customer')){
-        Media::addJsDef(array('id_customer_wmbr' => Tools::getValue('id_customer')));
+      $edit_id_customer = Tools::getValue('id_customer') ?: Tools::getValue('customerId');
+      if($edit_id_customer){
+        Media::addJsDef(array('id_customer_wmbr' => $edit_id_customer));
+
+        $doc = Db::getInstance()->getRow('SELECT nfe_document_number, nfe_document_type, nfe_razao_social, nfe_pj_ie FROM '._DB_PREFIX_.'customer WHERE id_customer = '.(int)$edit_id_customer);
+        if($doc && !empty($doc['nfe_document_number'])){
+          Media::addJsDef(array('customer_doc_wmbr' => array(
+            'document_number' => $doc['nfe_document_number'],
+            'document_type'   => $doc['nfe_document_type'],
+            'razao_social'    => $doc['nfe_razao_social'],
+            'ie'              => $doc['nfe_pj_ie'],
+          )));
+        }
       }
 
-      if(Tools::getValue('id_address')){
-        Media::addJsDef(array('id_address_wmbr' => Tools::getValue('id_address')));
+      $edit_id_address = Tools::getValue('id_address') ?: Tools::getValue('addressId');
+      if($edit_id_address){
+        Media::addJsDef(array('id_address_wmbr' => $edit_id_address));
+
+        $addr = Db::getInstance()->getRow('SELECT address_number, bairro FROM '._DB_PREFIX_.'address WHERE id_address = '.(int)$edit_id_address);
+        if($addr){
+          Media::addJsDef(array('address_doc_wmbr' => array(
+            'address_number' => $addr['address_number'],
+            'bairro'         => $addr['bairro'],
+          )));
+        }
       }
 
 
       Media::addJsDef(array('tipo_pessoa_enabled' => $cpf_cnpj_status));
       Media::addJsDef(array('numero_enabled' => $numero_enabled));
 
+      Media::addJsDef(array('wmbr_module_path' => __PS_BASE_URI__.'modules/'.$this->name.'/'));
+
       Media::addJsDef(array('sec_token' => Tools::getAdminToken('7Br2ZZwaRD')));
 
       if (_PS_VERSION_ >= '1.7.7') {
-        $this->context->controller->addJS($this->_path.'/js/scripts_bo.1.7.7.js', 'all');
+        $this->context->controller->addJS($this->_path.'/js/scripts_bo.1.7.7.js?v='.$this->version, 'all');
       }
       else {
-        $this->context->controller->addJS($this->_path.'/js/scripts_bo.1.6-1.7.js', 'all');
+        $this->context->controller->addJS($this->_path.'/js/scripts_bo.1.6-1.7.js?v='.$this->version, 'all');
       }
-      
-      $this->context->controller->addCSS($this->_path.'/views/css/style.css', 'all');
+
+      $this->context->controller->addCSS($this->_path.'/views/css/style.css?v='.$this->version, 'all');
     }
 
     //Support to PS 1.5
     if(_MAIN_PS_VERSION_ == '1.5'){
       $this->rearrangeStates();
       $controllerName = $this->context->controller->controller_name;
-      if(($controllerName == 'AdminOrders' && !Tools::getValue('id_order')) || $controllerName = 'AdminCustomers' || $controllerName = 'AdminAddresses'){
+      if(($controllerName == 'AdminOrders' && !Tools::getValue('id_order')) || $controllerName == 'AdminCustomers' || $controllerName == 'AdminAddresses'){
         $this->context->controller->addJS($this->_path.'/js/scripts_bo.1.5.js', 'all');
         $this->context->controller->addJS($this->_path.'/js/jquery.mask.min.js', 'all');
         $this->context->controller->addCSS($this->_path.'/views/css/style.css', 'all');
@@ -1317,7 +1423,7 @@ class WebmaniaBrNFe extends Module{
       'nfe_peso_liquido' => pSQL(Tools::getValue('nfe_peso_liquido')),
       'nfe_valor_seguro' => pSQL(Tools::getValue('nfe_valor_seguro')),
     ),'id_order = ' .$order_id )){
-      $this->context->controller->_errors[] = 'Error: '.mysql_error();
+      $this->context->controller->_errors[] = 'Error: '.Db::getInstance()->getMsgError();
     }
 
   }
@@ -1371,7 +1477,7 @@ class WebmaniaBrNFe extends Module{
       }
     }
 
-    if(_MAIN_PS_VERSION_ == '1.6' || _MAIN_PS_VERSION_ == '1.7'){
+    if(_MAIN_PS_VERSION_ == '1.6' || _MAIN_PS_VERSION_ == '1.7' || $this->isPrestaShop8Plus()){
 
       if(Configuration::get($this->name.'mask_fields') == 'on'){
         Media::addJsDef(array('mask_doc_fields' => true));
@@ -1391,7 +1497,9 @@ class WebmaniaBrNFe extends Module{
     }
 
     $this->context->controller->addJS($this->_path.'/js/correios.min.js', 'all');
-    $this->context->controller->addJS($this->_path.'/js/jquery.mask.min.js', 'all');
+    if(_MAIN_PS_VERSION_ == '1.5' || _MAIN_PS_VERSION_ == '1.6' || _MAIN_PS_VERSION_ == '1.7'){
+      $this->context->controller->addJS($this->_path.'/js/jquery.mask.min.js', 'all');
+    }
     $this->context->controller->addCSS($this->_path.'/views/css/style.css', 'all');
 
   }
@@ -1470,7 +1578,7 @@ class WebmaniaBrNFe extends Module{
       'nfe_product_source' => pSQL(Tools::getValue('nfe_product_source')),
       'nfe_ignorar_nfe' => pSQL(Tools::getValue('nfe_ignorar_nfe'))
     ),'id_product = ' .$id_product )){
-      $this->context->controller->_errors[] = 'Error: '.mysql_error();
+      $this->context->controller->_errors[] = 'Error: '.Db::getInstance()->getMsgError();
     }
 
   }
@@ -1495,7 +1603,7 @@ class WebmaniaBrNFe extends Module{
     }
 
     if(!Db::getInstance()->update('customer', $DB_data, 'id_customer = ' .$customer_id )){
-      $this->context->controller->_errors[] = 'Error: '.mysql_error();
+      $this->context->controller->_errors[] = 'Error: '.Db::getInstance()->getMsgError();
     }
 
   }
@@ -1548,7 +1656,7 @@ class WebmaniaBrNFe extends Module{
         $this->smarty->assign('custom_var', $var);
       }
 
-      if(_MAIN_PS_VERSION_ == '1.6' || _MAIN_PS_VERSION_ == '1.7'){
+      if(_MAIN_PS_VERSION_ == '1.6' || _MAIN_PS_VERSION_ == '1.7' || $this->isPrestaShop8Plus()){
 
         if(Configuration::get($this->name.'mask_fields') == 'on'){
           $var = 'on';
@@ -2003,6 +2111,90 @@ class WebmaniaBrNFe extends Module{
     $this->updateCustomerDocument($customer_id);
 
   }
+
+  /**
+   * Hook for PrestaShop 8+ front controller set media
+   */
+  public function hookActionFrontControllerSetMedia($params = null) {
+    if ($this->isPrestaShop8Plus()) {
+      // CSS do módulo no FO (PS 8/9)
+      $this->context->controller->addCSS($this->_path.'/views/css/style.css', 'all');
+      // Evita duplicidade com hookDisplayHeader em versões antigas
+      if(Configuration::get($this->name.'mask_fields') == 'on'){
+        $this->context->controller->addJS($this->_path.'/js/jquery.mask.min.js', 'all');
+      }
+      // Em PS 8/9, reutilizamos o script de 1.7 (compatível)
+      $this->context->controller->addJS($this->_path.'/js/scripts_fo.1.7.js', 'all');
+    }
+  }
+
+  /**
+   * Hook for PrestaShop 8+ admin controller set media
+   */
+  public function hookActionAdminControllerSetMedia($params = null) {
+    // scripts_bo, jquery.mask and the CPF/CNPJ JsDefs are loaded by
+    // hookBackOfficeHeader, which also runs on PS 8/9; loading them here as
+    // well would register the events and inject the fields twice.
+  }
+
+  /**
+   * Hook for PrestaShop 8+ admin order main display
+   */
+  public function hookDisplayAdminOrderMain($params) {
+    if ($this->isPrestaShop8Plus()) {
+      return $this->hookDisplayAdminOrderTop($params);
+    }
+    return '';
+  }
+
+  /**
+   * Hook for PrestaShop 9+ admin order main bottom display
+   */
+  public function hookDisplayAdminOrderMainBottom($params) {
+    if ($this->isPrestaShop9Plus()) {
+      return $this->hookDisplayAdminOrderTop($params);
+    }
+    return '';
+  }
+
+  /**
+   * Hook for PrestaShop 8+ order status update
+   */
+  public function hookActionOrderStatusPostUpdate($params) {
+    // Compatível com 1.7.7+, 8 e 9
+    if (!isset($params['id_order']) || !isset($params['newOrderStatus'])) return;
+    $order_id = (int)$params['id_order'];
+    $new_order_status = $params['newOrderStatus'];
+    $automatic = Configuration::get($this->name.'automatic_emit');
+    if($automatic == 'on' && isset($new_order_status->id)) {
+      $ids_config = trim((string)Configuration::get($this->name.'auto_emit_status_ids'));
+      $ids = array();
+      if ($ids_config !== '') {
+        foreach (explode(',', $ids_config) as $id) {
+          $id = (int)trim($id);
+          if ($id > 0) { $ids[] = $id; }
+        }
+      }
+      if (empty($ids)) { $ids = array(3,4,5); }
+      if (in_array((int)$new_order_status->id, $ids, true)) {
+        $this->emitirNfe($order_id);
+      }
+    }
+  }
+
+  /**
+   * Hook for PrestaShop 9+ validate order after
+   */
+  public function hookActionValidateOrderAfter($params) {
+    if ($this->isPrestaShop9Plus()) {
+      $order_id = $params['order']->id;
+      $automatic = Configuration::get($this->name.'automatic_emit');
+      
+      if($automatic == 'on') {
+        $this->emitirNfe($order_id);
+      }
+    }
+  }
   /*********************** END HOOKED FUNCTIONS **************************/
 
 
@@ -2046,7 +2238,7 @@ class WebmaniaBrNFe extends Module{
 
     $order = new Order($orderID);
 
-    $discounts = $order->getDiscounts(true);
+    $discounts = method_exists($order, 'getDiscounts') ? $order->getDiscounts(true) : $order->getCartRules();
     $discounts_applied = array(); // Only percentage
 
     $envio_email = Configuration::get($this->name.'envio_email');
@@ -2939,18 +3131,18 @@ class WebmaniaBrNFe extends Module{
 
 		$j = 5;
 		$k = 6;
-		$soma1 = "";
-		$soma2 = "";
+		$soma1 = 0;
+		$soma2 = 0;
 
 		for ($i = 0; $i < 13; $i++) {
 
 			$j = $j == 1 ? 9 : $j;
 			$k = $k == 1 ? 9 : $k;
 
-			$soma2 += ($cnpj{$i} * $k);
+			$soma2 += ($cnpj[$i] * $k);
 
 			if ($i < 12) {
-				$soma1 += ($cnpj{$i} * $j);
+				$soma1 += ($cnpj[$i] * $j);
 			}
 
 			$k--;
@@ -2961,7 +3153,7 @@ class WebmaniaBrNFe extends Module{
 		$digito1 = $soma1 % 11 < 2 ? 0 : 11 - $soma1 % 11;
 		$digito2 = $soma2 % 11 < 2 ? 0 : 11 - $soma2 % 11;
 
-		return (($cnpj{12} == $digito1) and ($cnpj{13} == $digito2));
+		return (($cnpj[12] == $digito1) and ($cnpj[13] == $digito2));
 
     }
   }
