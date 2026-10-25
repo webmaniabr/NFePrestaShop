@@ -2,6 +2,10 @@
 
 namespace webmaniabrnfe\Controller;
 
+if (!defined('_PS_VERSION_')) {
+    exit;
+}
+
 use PrestaShopBundle\Controller\Admin\FrameworkBundleAdminController;
 // Usar classe legada para máxima compatibilidade
 use Module as LegacyModule;
@@ -9,7 +13,9 @@ use Module as LegacyModule;
 class EmitirNfeController extends FrameworkBundleAdminController {
 
   public function receiveBulkAction() {
-    $ids = $_POST['order_orders_bulk'] ?? $_POST['bulk_action_selected_orders'] ?? array();
+    $this->denyAccessUnlessGranted('update', 'AdminOrders');
+
+    $ids = isset($_POST['order_orders_bulk']) ? $_POST['order_orders_bulk'] : (isset($_POST['bulk_action_selected_orders']) ? $_POST['bulk_action_selected_orders'] : array());
     
     // Get module instance with compatibilidade máxima (classe legada)
     $webmaniabrnfe = \Module::getInstanceByName('webmaniabrnfe');
@@ -19,6 +25,7 @@ class EmitirNfeController extends FrameworkBundleAdminController {
       return $this->redirect($this->getAdminLink('AdminOrders', array()));
     }
 
+    $ids = is_array($ids) ? array_filter(array_map('intval', $ids)) : array();
     foreach ($ids as $id) {
       try {
         $responses = $webmaniabrnfe->emitirNfe($id);
@@ -26,7 +33,7 @@ class EmitirNfeController extends FrameworkBundleAdminController {
         foreach ($responses as $response) {
           $this->addFlash($response['type'], $response['msg']);
         }
-      } catch (Exception $e) {
+      } catch (\Exception $e) {
         $this->addFlash('error', 'Erro ao emitir NFe para pedido ' . $id . ': ' . $e->getMessage());
       }
     }

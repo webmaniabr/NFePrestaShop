@@ -2,14 +2,20 @@
 
 namespace webmaniabrnfe\Controller;
 
+if (!defined('_PS_VERSION_')) {
+    exit;
+}
+
 use PrestaShopBundle\Controller\Admin\FrameworkBundleAdminController;
 use PrestaShop\PrestaShop\Adapter\Module\Module;
 
 class BulkActionsController extends FrameworkBundleAdminController {
 
   public function emitirNfe() {
+    $this->denyAccessUnlessGranted('update', 'AdminOrders');
 
-    $ids = $_POST['order_orders_bulk'];
+
+    $ids = isset($_POST['order_orders_bulk']) && is_array($_POST['order_orders_bulk']) ? array_filter(array_map('intval', $_POST['order_orders_bulk'])) : array();
     $webmaniabrnfe = \Module::getInstanceByName('webmaniabrnfe');
 
     foreach ($ids as $id) {
@@ -25,8 +31,10 @@ class BulkActionsController extends FrameworkBundleAdminController {
   }
 
   public function imprimirDanfe() {
+    $this->denyAccessUnlessGranted('read', 'AdminOrders');
+
     
-    $ids = $_POST['order_orders_bulk'];
+    $ids = isset($_POST['order_orders_bulk']) && is_array($_POST['order_orders_bulk']) ? array_filter(array_map('intval', $_POST['order_orders_bulk'])) : array();
     $uri = $_SERVER['REQUEST_URI'];
 
     if (strpos($uri, 'imprimir_danfe_etiqueta') !== false) {

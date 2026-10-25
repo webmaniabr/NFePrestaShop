@@ -32,19 +32,19 @@
     <h4 style="margin-bottom:15px;">Volumes Transportados</h4>
     <div class="form-group nfe-form-group">
       <label class="control-label col-md-2">Volumes</label>
-      <div class="col-md-6"><input type="text" name="nfe_volumes" value="{$transporte_info['nfe_volumes']}"/></div>
+      <div class="col-md-6"><input type="text" name="nfe_volumes" value="{$transporte_info['nfe_volumes']|escape:'html':'UTF-8'}"/></div>
     </div>
     <div class="form-group nfe-form-group">
       <label class="control-label col-md-2">Espécie</label>
-      <div class="col-md-6"><input type="text" name="nfe_especie" value="{$transporte_info['nfe_especie']}"/></div>
+      <div class="col-md-6"><input type="text" name="nfe_especie" value="{$transporte_info['nfe_especie']|escape:'html':'UTF-8'}"/></div>
     </div>
     <div class="form-group nfe-form-group">
       <label class="control-label col-md-2">Peso Bruto</label>
-      <div class="col-md-6"><input type="text" name="nfe_peso_bruto" value="{$transporte_info['nfe_peso_bruto']}" placeholder="Ex: 50.210 = 50,210KG"/></div>
+      <div class="col-md-6"><input type="text" name="nfe_peso_bruto" value="{$transporte_info['nfe_peso_bruto']|escape:'html':'UTF-8'}" placeholder="Ex: 50.210 = 50,210KG"/></div>
     </div>
     <div class="form-group nfe-form-group">
       <label class="control-label col-md-2">Peso Líquido</label>
-      <div class="col-md-6"><input type="text" name="nfe_peso_liquido" value="{$transporte_info['nfe_peso_liquido']}" placeholder="Ex: 50.210 = 50,210KG"/></div>
+      <div class="col-md-6"><input type="text" name="nfe_peso_liquido" value="{$transporte_info['nfe_peso_liquido']|escape:'html':'UTF-8'}" placeholder="Ex: 50.210 = 50,210KG"/></div>
     </div>
     <input type="submit" class="btn btn-default" value="Salvar" />
     <input type="hidden" name="nfe-transporte-info" value="save-fields"  />

@@ -18,7 +18,7 @@
       </ul>
   </div>
   {/if}
-  <form>
+  <form action="{$link->getModuleLink('webmaniabrnfe', 'view16')|escape:'html':'UTF-8'}" method="post">
   <div class="clearfix">
     <label>Tipo de pessoa:</label><br/>
     {if $document_type == 'cnpj'}
@@ -51,20 +51,20 @@
   </div>
   <div id="cpf-field" class="form-group {if $document_type != 'cnpj'} active{/if}" style="{if $document_type == 'cnpj'}display:none;{/if}overflow:hidden" >
     <label>CPF <sup>*</sup></label>
-    <input type="text" class="form-control" name="cpf" id="cpf-input" value="{if $document_type == 'cpf'}{$document_number}{/if}"/>
+    <input type="text" class="form-control" name="cpf" id="cpf-input" value="{if $document_type == 'cpf'}{$document_number|escape:'html':'UTF-8'}{/if}"/>
   </div>
   <div id="cnpj-field" {if $document_type != 'cnpj'} style="display:none" {/if}  {if $document_type == 'cnpj'} class="active" style="display:block;overflow:hidden" {/if}>
     <div class="form-group">
       <label>Razão Social <sup>*</sup></label>
-      <input type="text" class="form-control" name="razao_social" value="{if $document_type == 'cnpj'} {$razao_social}{/if}"/>
+      <input type="text" class="form-control" name="razao_social" value="{if $document_type == 'cnpj'}{$razao_social|escape:'html':'UTF-8'}{/if}"/>
     </div>
     <div class="form-group">
       <label>CNPJ <sup>*</sup></label>
-      <input type="text" class="form-control" name="cnpj" id="cnpj-input" value="{if $document_type == 'cnpj'}{$document_number}{/if}" />
+      <input type="text" class="form-control" name="cnpj" id="cnpj-input" value="{if $document_type == 'cnpj'}{$document_number|escape:'html':'UTF-8'}{/if}" />
     </div>
     <div class="form-group">
       <label>Inscrição estadual <sup>*</sup></label>
-      <input type="text" class="form-control" name="cnpj_ie" id="ie-input" value="{if $document_type == 'cnpj'} {$pj_ie}{/if}"/>
+      <input type="text" class="form-control" name="cnpj_ie" id="ie-input" value="{if $document_type == 'cnpj'}{$pj_ie|escape:'html':'UTF-8'}{/if}"/>
     </div>
   </div>
   <div class="form-group">
@@ -73,6 +73,7 @@
       </button>
   </div>
   <input type="hidden" name="document_types" value="sent" />
+  <input type="hidden" name="token" value="{$wmbr_token|escape:'html':'UTF-8'}" />
   </form>
 </div>
 <style>

@@ -4,6 +4,7 @@
     <h3 class="tab">Informações Fiscais (Opcional)</h3>
     <div class="checkbox">
       <label>
+        <input type="hidden" name="nfe_ignorar_nfe" value="0"/>
         <input type="checkbox" name="nfe_ignorar_nfe" value="1" {if $ignorar_nfe == 1} checked {/if} style="margin-top:20px"/>Ignorar produto ao emitir NFe
       </label>
     </div>
@@ -12,7 +13,7 @@
       <label class="form-control-label">Classe de Imposto</label>
       <div class="row">
         <div class="col-md-6">
-          <input type="text" name="nfe_tax_class" value="{$tax_class}" class="form-control"/>
+          <input type="text" name="nfe_tax_class" value="{$tax_class|escape:'html':'UTF-8'}" class="form-control"/>
         </div>
       </div>
     </div>
@@ -21,7 +22,7 @@
       <label class="form-control-label">GTIN (Antigo código EAN)</label>
       <div class="row">
         <div class="col-md-6">
-          <input type="text" name="nfe_ean_bar_code" value="{$ean_bar_code}" class="form-control"/>
+          <input type="text" name="nfe_ean_bar_code" value="{$ean_bar_code|escape:'html':'UTF-8'}" class="form-control"/>
         </div>
       </div>
     </div>
@@ -30,7 +31,7 @@
       <label class="form-control-label">GTIN Tributável</label>
       <div class="row">
         <div class="col-md-6">
-          <input type="text" name="nfe_gtin_tributavel" value="{$gtin_tributavel}" class="form-control"/>
+          <input type="text" name="nfe_gtin_tributavel" value="{$gtin_tributavel|escape:'html':'UTF-8'}" class="form-control"/>
         </div>
       </div>
     </div>
@@ -39,7 +40,7 @@
       <label class="form-control-label">Código NCM</label>
       <div class="row">
         <div class="col-md-6">
-          <input type="text" name="nfe_ncm_code" value="{$ncm_code}" class="form-control"/>
+          <input type="text" name="nfe_ncm_code" value="{$ncm_code|escape:'html':'UTF-8'}" class="form-control"/>
         </div>
       </div>
     </div>
@@ -48,7 +49,7 @@
       <label class="form-control-label">Código CEST</label>
       <div class="row">
         <div class="col-md-6">
-          <input type="text" name="nfe_cest_code" value="{$cest_code}" class="form-control"/>
+          <input type="text" name="nfe_cest_code" value="{$cest_code|escape:'html':'UTF-8'}" class="form-control"/>
         </div>
       </div>
     </div>
@@ -57,7 +58,7 @@
       <label class="form-control-label">CNPJ do fabricante da mercadoria</label>
       <div class="row">
         <div class="col-md-6">
-          <input type="text" name="nfe_cnpj_fabricante" value="{$cnpj_fabricante}" class="form-control"/>  
+          <input type="text" name="nfe_cnpj_fabricante" value="{$cnpj_fabricante|escape:'html':'UTF-8'}" class="form-control"/>  
         </div>
       </div>
     </div>
@@ -66,7 +67,7 @@
       <label class="form-control-label">Indicador de escala relevante</label>
       <div class="row">
         <div class="col-md-6">
-          <select class="form-control" name="nfe_ind_escala" value="{$nfe_ind_escala}">
+          <select class="form-control" name="nfe_ind_escala" value="{$ind_escala|escape:'html':'UTF-8'}">
             <option value="">Selecionar</option>
               {assign var=options value=[
                 'S' => 'S - Produzido em Escala Relevante',
@@ -91,7 +92,7 @@
       <label class="form-control-label">Origem</label>
       <div class="row">
         <div class="col-md-6">
-          <select class="form-control" name="nfe_product_source" value="{$product_source}">
+          <select class="form-control" name="nfe_product_source" value="{$product_source|escape:'html':'UTF-8'}">
             {assign var=options value=[
                 '-1' => 'Selecionar Origem do Produto',
                 '0' => '0 - Nacional, exceto as indicadas nos códigos 3, 4, 5, e 8',

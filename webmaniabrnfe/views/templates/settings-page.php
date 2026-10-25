@@ -1,4 +1,7 @@
 <?php 
+if (!defined('_PS_VERSION_')) {
+  exit;
+}
 
 $fields_values = $this->getConfigFieldsValues();
 
@@ -25,35 +28,39 @@ if($carriers){
       </div>
       <div class="form-wrapper">
          <div class="form-group">
-            <label class="control-label col-lg-3 required">
+            <label class="control-label col-lg-3">
             Consumer Key
             </label>
             <div class="col-lg-9">
-               <input type="text" name="webmaniabrnfeconsumer_key" id="webmaniabrnfeconsumer_key" value="<?php echo $fields_values[$this->name.'consumer_key']; ?>" class="" size="50" required="required">
+               <input type="password" autocomplete="new-password" name="webmaniabrnfeconsumer_key" id="webmaniabrnfeconsumer_key" value="" class="" size="50">
+               <p class="help-block">Deixe vazio para manter a credencial salva.</p>
             </div>
          </div>
          <div class="form-group">
-            <label class="control-label col-lg-3 required">
+            <label class="control-label col-lg-3">
             Consumer Secret
             </label>
             <div class="col-lg-9">
-               <input type="text" name="webmaniabrnfeconsumer_secret" id="webmaniabrnfeconsumer_secret" value="<?php echo $fields_values[$this->name.'consumer_secret']; ?>" class="" size="50" required="required">
+               <input type="password" autocomplete="new-password" name="webmaniabrnfeconsumer_secret" id="webmaniabrnfeconsumer_secret" value="" class="" size="50">
+               <p class="help-block">Deixe vazio para manter a credencial salva.</p>
             </div>
          </div>
          <div class="form-group">
-            <label class="control-label col-lg-3 required">
+            <label class="control-label col-lg-3">
             Access Token
             </label>
             <div class="col-lg-9">
-               <input type="text" name="webmaniabrnfeaccess_token" id="webmaniabrnfeaccess_token" value="<?php echo $fields_values[$this->name.'access_token']; ?>" class="" size="50" required="required">
+               <input type="password" autocomplete="new-password" name="webmaniabrnfeaccess_token" id="webmaniabrnfeaccess_token" value="" class="" size="50">
+               <p class="help-block">Deixe vazio para manter a credencial salva.</p>
             </div>
          </div>
          <div class="form-group">
-            <label class="control-label col-lg-3 required">
+            <label class="control-label col-lg-3">
             Access Token Secret
             </label>
             <div class="col-lg-9">
-               <input type="text" name="webmaniabrnfeaccess_token_secret" id="webmaniabrnfeaccess_token_secret" value="<?php echo $fields_values[$this->name.'access_token_secret']; ?>" class="" size="50" required="required">
+               <input type="password" autocomplete="new-password" name="webmaniabrnfeaccess_token_secret" id="webmaniabrnfeaccess_token_secret" value="" class="" size="50">
+               <p class="help-block">Deixe vazio para manter a credencial salva.</p>
             </div>
          </div>
          <div class="form-group">
@@ -523,9 +530,13 @@ if($carriers){
               <div class="carriers-list">
                 <?php
                 
-                  foreach($carriers as $carrier){
-                    echo '<div class="carrier-item" data-id="'.$carrier['id'].'">
-                            <p>'.$carrier['razao_social'].' <br/>(<span>Editar</span>)</p>
+                  // The carriers setting is saved without Validate::isGenericName(): escape it here.
+                  foreach(is_array($carriers) ? $carriers : array() as $carrier){
+                    if (!is_array($carrier)) { continue; }
+                    $carrier_id = isset($carrier['id']) && is_scalar($carrier['id']) ? htmlspecialchars((string) $carrier['id'], ENT_QUOTES, 'UTF-8') : '';
+                    $carrier_rs = isset($carrier['razao_social']) && is_scalar($carrier['razao_social']) ? htmlspecialchars((string) $carrier['razao_social'], ENT_QUOTES, 'UTF-8') : '';
+                    echo '<div class="carrier-item" data-id="'.$carrier_id.'">
+                            <p>'.$carrier_rs.' <br/>(<span>Editar</span>)</p>
                             <span class="delete">x</span>
                           </div>';
                   }
@@ -533,7 +544,7 @@ if($carriers){
                 ?>
               </div>
               <button type="button" class="btn btn-primary btn--add-carrier" data-toggle="modal" data-target="#add-carrier-modal">Adicionar transportadora</button>
-              <input type="hidden"  name="webmaniabrnfecarriers" value="<?php echo str_replace('%', '=', $fields_values[$this->name.'carriers']); ?>" />
+              <input type="hidden"  name="webmaniabrnfecarriers" value="<?php echo htmlspecialchars(str_replace('%', '=', (string) $fields_values[$this->name.'carriers']), ENT_QUOTES, 'UTF-8'); ?>" />
             </div>
          </div>
          

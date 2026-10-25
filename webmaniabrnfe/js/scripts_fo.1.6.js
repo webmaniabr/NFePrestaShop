@@ -79,7 +79,7 @@ jQuery(document).ready(function(){
 
       maskDocuments: function(){
         $('#cpf-input').mask('999.999.999-99');
-        $('#cnpj-input').mask('99.999.999/9999-99');
+        $('#cnpj-input').mask('AA.AAA.AAA/AAAA-00');
         return true;
       },
 
@@ -120,7 +120,7 @@ jQuery(document).ready(function(){
               adminToken: sec_token,
             },
             success: function(json) {
-              result = $.parseJSON(json);
+              result = (typeof json === 'string' ? $.parseJSON(json) : json);
               if(typeof result.address_number != 'undefined'){
                 $('input[name="address_number"]').val(result.address_number);
               }

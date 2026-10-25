@@ -1,7 +1,20 @@
 <?php
+if (!defined('_PS_VERSION_')) {
+  exit;
+}
 
-$order_id = $order['order']->id;
-$transporte_info = Db::getInstance()->getRow("SELECT nfe_modalidade_frete, nfe_volumes, nfe_especie, nfe_peso_bruto, nfe_peso_liquido, nfe_valor_seguro FROM "._DB_PREFIX_."orders WHERE id_order = $order_id");
+// displayAdminOrderContentShip (1.6) passes array('order' => Order); displayAdminOrderTabContent
+// (1.7.7+) passes array('id_order' => int) as $params.
+if (isset($order['order']) && is_object($order['order']) && isset($order['order']->id)) {
+  $order_id = (int) $order['order']->id;
+} else {
+  $order_id = isset($params['id_order']) ? (int) $params['id_order'] : 0;
+}
+$transporte_info = Db::getInstance()->getRow("SELECT nfe_modalidade_frete, nfe_volumes, nfe_especie, nfe_peso_bruto, nfe_peso_liquido, nfe_valor_seguro FROM "._DB_PREFIX_."orders WHERE id_order = ".$order_id);
+if (!is_array($transporte_info)) { $transporte_info = array(); }
+$transporte_value = function ($key) use ($transporte_info) {
+  return isset($transporte_info[$key]) ? htmlspecialchars((string) $transporte_info[$key], ENT_QUOTES, 'UTF-8') : '';
+};
 
 ?>
 
@@ -28,7 +41,7 @@ $transporte_info = Db::getInstance()->getRow("SELECT nfe_modalidade_frete, nfe_v
 
         foreach($options as $value => $label){
 
-          $selected = $transporte_info['nfe_modalidade_frete'] == $value ? 'selected' : '';
+          $selected = isset($transporte_info['nfe_modalidade_frete']) && $transporte_info['nfe_modalidade_frete'] == $value ? 'selected' : '';
           echo '<option value="'.$value.'" '.$selected.'>'.$label.'</option>';
 
         }
@@ -42,27 +55,27 @@ $transporte_info = Db::getInstance()->getRow("SELECT nfe_modalidade_frete, nfe_v
     <p style="font-size:14px;line-height:1.5em;font-weight:bold;color:red">Volumes Transportados</p>
     <div class="form-group">
       <label>Volumes</label>
-      <input name="nfe_volumes" type="text" value="<?php echo $transporte_info['nfe_volumes']; ?>"/>
+      <input name="nfe_volumes" type="text" value="<?php echo $transporte_value('nfe_volumes'); ?>"/>
     </div>
 
     <div class="form-group">
       <label>Espécie</label>
-      <input type="text" name="nfe_especie" value="<?php echo $transporte_info['nfe_especie']; ?>"/>
+      <input type="text" name="nfe_especie" value="<?php echo $transporte_value('nfe_especie'); ?>"/>
     </div>
 
     <div class="form-group">
       <label>Peso Bruto (KG)</label>
-      <input type="text" name="nfe_peso_bruto" placeholder="EX: 50.210 = 50,210KG" value="<?php echo $transporte_info['nfe_peso_bruto']; ?>"/>
+      <input type="text" name="nfe_peso_bruto" placeholder="EX: 50.210 = 50,210KG" value="<?php echo $transporte_value('nfe_peso_bruto'); ?>"/>
     </div>
 
     <div class="form-group">
       <label>Peso Líquido (KG)</label>
-      <input type="text" name="nfe_peso_liquido" placeholder="EX: 50.210 = 50,210KG" value="<?php echo $transporte_info['nfe_peso_liquido']; ?>"/>
+      <input type="text" name="nfe_peso_liquido" placeholder="EX: 50.210 = 50,210KG" value="<?php echo $transporte_value('nfe_peso_liquido'); ?>"/>
     </div>
 
     <div class="form-group">
       <label>Valor seguro</label>
-      <input type="text" name="nfe_valor_seguro" placeholder="EX: 10.20" value="<?php echo $transporte_info['nfe_valor_seguro']; ?>"/>
+      <input type="text" name="nfe_valor_seguro" placeholder="EX: 10.20" value="<?php echo $transporte_value('nfe_valor_seguro'); ?>"/>
     </div>
 
     <input type="hidden" class="btn btn-primary" name="nfe-transporte-info" value="1" />

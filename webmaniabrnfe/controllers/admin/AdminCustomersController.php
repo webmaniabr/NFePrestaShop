@@ -1,4 +1,7 @@
 <?php
+if (!defined('_PS_VERSION_')) {
+    exit;
+}
 
 class AdminCustomersController extends AdminCustomersControllerCore{
 
@@ -378,13 +381,13 @@ class AdminCustomersController extends AdminCustomersControllerCore{
       $this->errors[] = Tools::displayError('Escolha o tipo de pessoa adequado');
     }else{
       if($document_type == 'cpf'){
-        if (!$webmaniabrnfe->validaCPF(Tools::getValue('cpf'))) {
+        if (!$webmaniabrnfe->is_cpf(Tools::getValue('cpf'))) {
             $this->errors[] = Tools::displayError('CPF inválido');
         }
       }
 
       if($document_type == 'cnpj'){
-        if (!$webmaniabrnfe->validaCNPJ(Tools::getValue('cnpj'))) {
+        if (!$webmaniabrnfe->is_cnpj(Tools::getValue('cnpj'))) {
             $this->errors[] = Tools::displayError('CNPJ inválido');
         }
         if (!Tools::getValue('razao_social')) {
@@ -399,16 +402,16 @@ class AdminCustomersController extends AdminCustomersControllerCore{
     $customer = parent::processAdd();
     if(isset($customer->id)){
       if($document_type == 'cpf'){
-        $document_number = preg_replace("[^0-9]","",Tools::getValue('cpf'));
+        $document_number = preg_replace("/[^0-9]/", "", (string) Tools::getValue('cpf'));
         $update_values = array(
           'nfe_document_type' => pSQL(Tools::getValue('document_type')),
           'nfe_document_number' => pSQL($document_number)
         );
         if(!Db::getInstance()->update('customer', $update_values, 'id_customer = ' .(int)$customer->id)){
-          $this->errors[] = Tools::displayError('Error: ').mysql_error();
+          $this->errors[] = Tools::displayError('Não foi possível atualizar as informações.');
         }
       }elseif($document_type == 'cnpj'){
-        $document_number = preg_replace("[^0-9]","",Tools::getValue('cnpj'));
+        $document_number = WebmaniaNFeSecurity::normalizeDocument(Tools::getValue('cnpj'));
         $update_values = array(
           'nfe_document_type' => pSQL(Tools::getValue('document_type')),
           'nfe_document_number' => pSQL($document_number),
@@ -417,7 +420,7 @@ class AdminCustomersController extends AdminCustomersControllerCore{
         );
 
         if(!Db::getInstance()->update('customer', $update_values, 'id_customer = ' .(int)$customer->id)){
-          $this->errors[] = Tools::displayError('Error: ').mysql_error();
+          $this->errors[] = Tools::displayError('Não foi possível atualizar as informações.');
         }
       }
       return $customer;
@@ -435,14 +438,14 @@ class AdminCustomersController extends AdminCustomersControllerCore{
       $error = true;
     }else{
       if($document_type == 'cpf'){
-        if (!$webmaniabrnfe->validaCPF(Tools::getValue('cpf'))) {
+        if (!$webmaniabrnfe->is_cpf(Tools::getValue('cpf'))) {
             $this->errors[] = Tools::displayError('CPF inválido');
             $error = true;
         }
       }
 
       if($document_type == 'cnpj'){
-        if (!$webmaniabrnfe->validaCNPJ(Tools::getValue('cnpj'))) {
+        if (!$webmaniabrnfe->is_cnpj(Tools::getValue('cnpj'))) {
             $this->errors[] = Tools::displayError('CNPJ inválido');
             $error = true;
         }
@@ -462,16 +465,16 @@ class AdminCustomersController extends AdminCustomersControllerCore{
     $customer = parent::processUpdate();
     if(isset($customer->id) && $error === false){
       if($document_type == 'cpf'){
-        $document_number = preg_replace("[^0-9]","",Tools::getValue('cpf'));
+        $document_number = preg_replace("/[^0-9]/", "", (string) Tools::getValue('cpf'));
         $update_values = array(
           'nfe_document_type' => pSQL(Tools::getValue('document_type')),
           'nfe_document_number' => pSQL($document_number)
         );
         if(!Db::getInstance()->update('customer', $update_values, 'id_customer = ' .(int)$customer->id)){
-          $this->errors[] = Tools::displayError('Error: ').mysql_error();
+          $this->errors[] = Tools::displayError('Não foi possível atualizar as informações.');
         }
       }elseif($document_type == 'cnpj'){
-        $document_number = preg_replace("[^0-9]","",Tools::getValue('cnpj'));
+        $document_number = WebmaniaNFeSecurity::normalizeDocument(Tools::getValue('cnpj'));
         $update_values = array(
           'nfe_document_type' => pSQL(Tools::getValue('document_type')),
           'nfe_document_number' => pSQL($document_number),
@@ -480,7 +483,7 @@ class AdminCustomersController extends AdminCustomersControllerCore{
         );
 
         if(!Db::getInstance()->update('customer', $update_values, 'id_customer = ' .(int)$customer->id)){
-          $this->errors[] = Tools::displayError('Error: ').mysql_error();
+          $this->errors[] = Tools::displayError('Não foi possível atualizar as informações.');
         }
       }
       return $customer;

@@ -14,19 +14,25 @@ if(!defined('_MAIN_PS_VERSION_')) {
 }
 
 //Webmania SDK to issue invoices
-require_once('sdk/NFe.php');
+require_once __DIR__ . '/sdk/NFe.php';
+require_once __DIR__ . '/sdk/Emission.php';
 
 //PDF Merger to print NFe DANFEs
-require_once('inc/pdf/PDFMerger.php');
+require_once __DIR__ . '/inc/pdf/PDFMerger.php';
 
 class WebmaniaBrNFe extends Module{
+  public $settings = array();
+  public $uniq_key;
+  private $automaticEmissionOrders = array();
+  private $emissionTokens = array();
+  private $emissionRelease = array();
 
 
   public function __construct(){
 
     $this->name = 'webmaniabrnfe';
     $this->tab = 'administration';
-    $this->version = '3.0.1';
+    $this->version = '3.0.3';
     $this->author = 'WebmaniaBR';
     $this->need_instance = 0;
     $this->ps_versions_compliancy = array('min' => '1.6', 'max' => _PS_VERSION_);
@@ -116,7 +122,69 @@ class WebmaniaBrNFe extends Module{
     return Tools::getAdminToken($controller.(int)Tab::getIdFromClassName($controller).(int)$this->context->employee->id);
   }
 
+  /** Permission of the current employee on a back-office tab ('1'/'0' on PS 1.6, roles on 1.7+). */
+  public function employeeCan($tab, $permission) {
+    $employee = isset($this->context->employee) ? $this->context->employee : null;
+    if (!is_object($employee) || empty($employee->id_profile)) { return false; }
+    $access = Profile::getProfileAccess((int) $employee->id_profile, (int) Tab::getIdFromClassName($tab));
+    return is_array($access) && !empty($access[$permission]);
+  }
+
+  /** Table/column names configured for document mapping may only be plain identifiers. */
+  public function isSqlIdentifier($name) {
+    return is_string($name) && (bool) preg_match('/^[a-zA-Z0-9_]{1,64}$/D', $name);
+  }
+
+  /** alterTable() stores the category NCM in category_lang on PS 1.6 and in category on 1.7+. */
+  public function categoryNcmTable() {
+    return _MAIN_PS_VERSION_ >= '1.7' ? 'category' : 'category_lang';
+  }
+
+  /** Callback URL from the configured shop domain, never from Host/X-Forwarded-Host. */
+  public function notificationUrl($uniq_key, $order_id) {
+    return Tools::getShopDomainSsl(true).__PS_BASE_URI__.'?retorno_nfe='.rawurlencode((string) $uniq_key).'&order_id='.(int) $order_id;
+  }
+
+  /** Automatic hooks only issue the first NF-e of an order; re-issuance stays a manual decision. */
+  public function emitirNfeAutomatico($order_id) {
+    $order_id = (int) $order_id;
+    if ($order_id < 1 || Configuration::get($this->name.'automatic_emit') != 'on') { return array(); }
+    if (WebmaniaNFeSecurity::invoices(Db::getInstance()->getValue('SELECT nfe_info FROM '._DB_PREFIX_.'orders WHERE id_order = '.$order_id, false))) { return array(); }
+    if (isset($this->automaticEmissionOrders[$order_id])) { return array(); }
+    $this->automaticEmissionOrders[$order_id] = true;
+    try { return $this->emitirNfe($order_id); }
+    finally { unset($this->automaticEmissionOrders[$order_id]); }
+  }
+
+  /** Webservice, CLI and IPN scripts have no controller; front controllers have no "confirmations". */
+  private function controllerMessage($property, $message) {
+    $controller = isset($this->context->controller) ? $this->context->controller : null;
+    if (!is_object($controller) || !isset($controller->$property) || !is_array($controller->$property)) { return; }
+    $messages = $controller->$property;
+    $messages[] = $message;
+    $controller->$property = $messages;
+  }
+
+  /** Transport data is saved by display hooks: require POST and order edit permission. */
+  public function canSaveTransportInfo() {
+    return Tools::getValue('nfe-transporte-info') && isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'POST' &&
+      $this->employeeCan('AdminOrders', 'edit');
+  }
+
+  public function ensureAjaxController() {
+    if (Tab::getIdFromClassName('AdminWebmaniaNfeAjax')) { return true; }
+    $tab = new Tab();
+    $tab->active = 0;
+    $tab->id_parent = -1;
+    $tab->class_name = 'AdminWebmaniaNfeAjax';
+    $tab->module = $this->name;
+    foreach (Language::getLanguages(false) as $language) { $tab->name[(int) $language['id_lang']] = 'Webmania NF-e AJAX'; }
+    return $tab->add();
+  }
+
   public function install(){
+    if (!$this->ensureAjaxController()) { return false; }
+
 
     //Set Default config values
     $configValues = $this->getConfigInitValues();
@@ -183,7 +251,7 @@ class WebmaniaBrNFe extends Module{
     }
 
     //Installation failed
-    if(!parent::install() || !$this->alterTable('add')){
+    if(!parent::install() || !$this->alterTable('add') || !WebmaniaNFeEmission::ensureTable()){
       return false;
     }
 
@@ -208,18 +276,17 @@ class WebmaniaBrNFe extends Module{
    */
   public function hookDisplayAdminCustomers(array $customer) {
 
-    $customer_id = $customer['id_customer'];
+    $customer_id = isset($customer['id_customer']) ? (int) $customer['id_customer'] : 0;
 
     //Get customer info
-    $customer_info = Db::getInstance()->getRow("SELECT nfe_document_type, nfe_document_number, nfe_razao_social, nfe_pj_ie FROM "._DB_PREFIX_."customer WHERE id_customer = $customer_id" );
+    $customer_info = Db::getInstance()->getRow("SELECT nfe_document_type, nfe_document_number, nfe_razao_social, nfe_pj_ie FROM "._DB_PREFIX_."customer WHERE id_customer = ".$customer_id );
 
-    if (!$customer_info['nfe_document_type']) {
+    if (!is_array($customer_info) || empty($customer_info['nfe_document_type'])) {
       return '';
     }
 
     $this->context->smarty->assign(array(
-      'customer_info' => $customer_info,
-      'url' => $url
+      'customer_info' => array_map('strval', $customer_info),
     ));
 
     //Customer info template
@@ -302,25 +369,26 @@ class WebmaniaBrNFe extends Module{
     );
  
     if ('nfe_issued' === $searchCriteria->getOrderBy()) {
-      $searchQueryBuilder->orderBy('o.`nfe_issued`', $searchCriteria->getOrderWay());
+      $searchQueryBuilder->orderBy('o.`nfe_issued`', strtolower((string) $searchCriteria->getOrderWay()) === 'desc' ? 'DESC' : 'ASC');
     }
 
   }
 
   public function hookDisplayAdminOrderTop($params) {
     
-    $order_id = $params['id_order'];
+    $order_id = (int) $params['id_order'];
+    $recovery = $this->displayEmissionRecovery($order_id);
     $order = new Order($order_id);
     $customer = $order->getCustomer();
     //Get order's nfe info
-    $nfe_info = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $order_id" ));
+    $nfe_info = WebmaniaNFeSecurity::invoices(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $order_id" ));
 
     $url  = 'index.php?controller=AdminOrders&id_order='.$order_id;
     $url .= '&vieworder&token='.Tools::getAdminTokenLite('AdminOrders');
 
     //Doesn't have invoices issued
     if (!$nfe_info) {
-      return "
+      return $recovery."
         <div class='nfe_info card'>
           <div class='card-header'>
             <h3 class='card-header-title'>Notas emitidas para este pedido</h3>
@@ -348,10 +416,10 @@ class WebmaniaBrNFe extends Module{
 
     //Set danfe simples/etiqueta url if it doesn't exist
     foreach ($nfe_info as $key => $nfe) {
-      if (!$nfe['url_danfe_simplificada']) {
+      if (empty($nfe['url_danfe_simplificada'])) {
         $nfe_info[$key]['url_danfe_simplificada'] = str_replace('/danfe/', '/danfe/simples/', $nfe['url_danfe']);
       }
-      if (!$nfe['url_danfe_etiqueta']) {
+      if (empty($nfe['url_danfe_etiqueta'])) {
         $nfe_info[$key]['url_danfe_etiqueta'] = str_replace('/danfe/', '/danfe/etiqueta/', $nfe['url_danfe']);
       }
       $password = !empty($nfe['documento']) ? $nfe['documento'] : $document;
@@ -371,7 +439,7 @@ class WebmaniaBrNFe extends Module{
 
     }
 
-    if(Tools::getValue('nfe-transporte-info')){
+    if($this->canSaveTransportInfo()){
       $this->save_order_transporte_info($order_id);
     }
 
@@ -381,11 +449,14 @@ class WebmaniaBrNFe extends Module{
     ));
 
     //NF-e info template
-    return $this->display(__FILE__, 'nfe_info_table.tpl');
+    return $recovery.$this->display(__FILE__, 'nfe_info_table.tpl');
 
   }
 
   public function uninstall(){
+    $tab_id = (int) Tab::getIdFromClassName('AdminWebmaniaNfeAjax');
+    if ($tab_id) { $tab = new Tab($tab_id); $tab->delete(); }
+
 
     if(!parent::uninstall()){
       return false;
@@ -398,12 +469,17 @@ class WebmaniaBrNFe extends Module{
 
   public function getContent(){
 
+
     $output = null;
     if(Tools::isSubmit('submit'.$this->name)){
       $fields = $this->getConfigInitValues();
       foreach($fields as $key => $value){
 
-        $input_value = strval(Tools::getValue($key));
+        $raw_value = Tools::getValue($key);
+        if (!is_scalar($raw_value)) { continue; }
+        $input_value = (string) $raw_value;
+        if (in_array($key, array($this->name.'consumer_key', $this->name.'consumer_secret', $this->name.'access_token', $this->name.'access_token_secret'), true) && $input_value === '') { continue; }
+
 
         if($input_value){
 
@@ -473,519 +549,18 @@ class WebmaniaBrNFe extends Module{
   }
 
   public function displayForm(){
-
     ob_start();
-
-    require_once('views/templates/settings-page.php');
-    $html = ob_get_clean();
-
-    return $html;
-
-
-
-    $default_language = (int)Configuration::get('PS_LANG_DEFAULT');
-
-    $select_options = array(
-      array(
-        'id_option' => -1,
-        'name' => $this->l('Selecionar Origem dos Produtos')
-      ),
-      array(
-        'id_option' => '00',
-        'name' => $this->l('0 - Nacional, exceto as indicadas nos códigos 3, 4, 5, e 8')
-      ),
-      array(
-        'id_option' => 1,
-        'name' => $this->l('1 - Estrangeira - Importação direta, exceto a indicada no código 6')
-      ),
-      array(
-        'id_option' => 2,
-        'name' => $this->l('2 - Estrangeira - Adquirida no mercado interno, exceto a indica no código 7')
-      ),
-      array(
-        'id_option' => 3,
-        'name' => $this->l('3 - Nacional, mercadoria ou bem com Conteúdo de Importação superior a 40% e inferior ou igual a 70%')
-      ),
-      array(
-        'id_option' => 4,
-        'name' => $this->l('4 - Nacional, cuja produção tenha sido feita em conformidade com os processos produtivos básicos de que tratam as legislações citadas nos Ajustes')
-      ),
-      array(
-        'id_option' => 5,
-        'name' => $this->l('5 - Nacional, mercadoria ou bem com Conteúdo de Importação inferior ou igual a 40%')
-      ),
-      array(
-        'id_option' => 6,
-        'name' => $this->l('6 - Estrangeira - Importação direta, sem similar nacional, constante em lista da CAMEX e gás natural')
-      ),
-      array(
-        'id_option' => 7,
-        'name' => $this->l('7 - Estrangeira - Adquirida no mercado interno, sem similar nacional, constante lista CAMEX e gás natural')
-      ),
-      array(
-        'id_option' => 8,
-        'name' => $this->l('8 - Nacional, mercadoria ou bem com Conteúdo de Importação superior a 70%')
-      )
-    );
-
-    $fields_form[0]['form'] = array(
-      'legend' => array(
-        'title' => $this->l('Credenciais de Acesso'),
-      ),
-      'input' => array(
-        array(
-          'type' => 'text',
-          'label' => $this->l('Consumer Key'),
-          'name' => $this->name.'consumer_key',
-          'size' => 50,
-          'required' => true
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('Consumer Secret'),
-          'name' => $this->name.'consumer_secret',
-          'size' => 50,
-          'required' => true
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('Access Token'),
-          'name' => $this->name.'access_token',
-          'size' => 50,
-          'required' => true
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('Access Token Secret'),
-          'name' => $this->name.'access_token_secret',
-          'size' => 50,
-          'required' => true
-        ),
-        array(
-          'type' => 'radio',
-          'label' => $this->l('Ambiente Sefaz'),
-          'name' => $this->name.'sefaz_env',
-          'required' => true,
-          'values' => array(
-            array(
-              'id' => 'production',
-              'value' => '1',
-              'label' => $this->l('Produção'),
-            ),
-            array(
-              'id' => 'development',
-              'value' => '2',
-              'label' => $this->l('Desenvolvimento'),
-            ),
-          )
-        ),
-      ),
-
-    );
-
-    $fields_form[1]['form'] = array(
-      'legend' => array(
-        'title' => $this->l('Configuração Padrão')
-      ),
-      'input' => array(
-        array(
-          'type' => 'radio',
-          'label' => $this->l('Emissão Automática'),
-          'name' => $this->name.'automatic_emit',
-          'desc' => $this->l('Emitir sautomaticamente a NF-e sempre que que um pagamento for confirmado'),
-          'values' => array(
-            array(
-              'id' => 'on',
-              'value' => 'on',
-              'label' => $this->l('Ativado'),
-            ),
-            array(
-              'id' => 'off',
-              'value' => 'off',
-              'label' => $this->l('Desativado'),
-            ),
-          )
-        ),
-
-        array(
-          'type' => 'radio',
-          'label' => $this->l('Envio automático de email'),
-          'name' => $this->name.'envio_email',
-          'desc' => $this->l('Atenção: O email será enviado mesmo para notas emitidas em ambiente de homologação!'),
-          'values' => array(
-            array(
-              'id' => 'on',
-              'value' => 'on',
-              'label' => $this->l('Ativado'),
-            ),
-            array(
-              'id' => 'off',
-              'value' => 'off',
-              'label' => $this->l('Desativado'),
-            ),
-          )
-        ),
-
-        array(
-          'type' => 'text',
-          'label' => $this->l('Natureza da Operação'),
-          'name' => $this->name.'operation_type',
-          'size' => 50,
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('Classe de Imposto'),
-          'name' => $this->name.'tax_class',
-          'size' => 50,
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('Código de Barras EAN'),
-          'name' => $this->name.'ean_barcode',
-          'size' => 50,
-
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('Código NCM'),
-          'name' => $this->name.'ncm_code',
-          'size' => 50,
-
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('Código CEST'),
-          'name' => $this->name.'cest_code',
-          'size' => 50,
-        ),
-        array(
-          'type' => 'select',
-          'label' => $this->l('Origem dos Produtos'),
-          'name' => $this->name.'product_source',
-          'options' => array(
-            'query' => $select_options,
-            'id' => 'id_option',
-            'name' => 'name'
-          )
-
-        ),
-      ),
-
-    );
-
-    $fields_form[2]['form'] = array(
-      'legend' => array(
-        'title' => $this->l('Informações Complementares (Opcional)'),
-      ),
-      'input' => array(
-        array(
-          'type' => 'textarea',
-          'label' => $this->l('Informações ao Fisco'),
-          'name' => $this->name.'fisco_inf',
-          'size' => 2000,
-          'cols' => 50,
-          'required' => false
-        ),
-        array(
-          'type' => 'textarea',
-          'label' => $this->l('Informações Complementares ao Consumidor'),
-          'name' => $this->name.'cons_inf',
-          'size' => 2000,
-          'cols' => 50,
-          'required' => false
-        ),
-      ),
-
-    );
-
-    $fields_form[3]['form'] = array(
-      'legend' => array(
-        'title' => $this->l('Campos obrigatórios (Banco de Dados)'),
-      ),
-
-      'input' => array(
-        array(
-          'type' => 'radio',
-          'label' => $this->l('Ativar campos CPF/CNPJ?'),
-          'name' => $this->name.'cpf_cnpj_status',
-          'values' => array(
-            array(
-              'id' => 'on',
-              'value' => 'on',
-              'label' => $this->l('Ativado'),
-            ),
-            array(
-              'id' => 'off',
-              'value' => 'off',
-              'label' => $this->l('Desativado'),
-            ),
-          )
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('Nome do campo CPF'),
-          'name' => $this->name.'cpf_field',
-          'size' => 50,
-        ),
-
-        array(
-          'type' => 'text',
-          'label' => $this->l('Nome do campo CNPJ'),
-          'name' => $this->name.'cnpj_field',
-          'size' => 50,
-        ),
-
-        array(
-          'type' => 'text',
-          'label' => $this->l('Nome do campo Razão Social'),
-          'name' => $this->name.'razao_social_field',
-          'size' => 50,
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('Nome do campo Inscrição Estadual'),
-          'name' => $this->name.'cnpj_ie_field',
-          'size' => 50,
-        ),
-
-        array(
-          'type' => 'radio',
-          'label' => $this->l('Ativar campo Número?'),
-          'name' => $this->name.'numero_compl_status',
-          'values' => array(
-            array(
-              'id' => 'on',
-              'value' => 'on',
-              'label' => $this->l('Ativado'),
-            ),
-            array(
-              'id' => 'off',
-              'value' => 'off',
-              'label' => $this->l('Desativado'),
-            ),
-          )
-        ),
-
-        array(
-          'type' => 'text',
-          'label' => $this->l('Nome do campo Número (Endereço)'),
-          'name' => $this->name.'numero_field',
-          'size' => 50,
-        ),
-
-      ),
-
-    );
-
-    if(_MAIN_PS_VERSION_ == '1.7'){
-      $fields_form[3]['form']['input'][] = array(
-
-          'type' => 'radio',
-          'label' => $this->l('Ativar campo Bairro?'),
-          'name' => $this->name.'bairro_status',
-          'values' => array(
-            array(
-              'id' => 'on',
-              'value' => 'on',
-              'label' => $this->l('Ativado'),
-            ),
-            array(
-              'id' => 'off',
-              'value' => 'off',
-              'label' => $this->l('Desativado'),
-            ),
-          )
-
-      );
-
-      $fields_form['3']['form']['input'][] = array(
-        'type' => 'text',
-        'label' => $this->l('Nome do campo Bairro (Endereço)'),
-        'name' => $this->name.'bairro_field',
-        'size' => 50,
-      );
-    }
-
-    $fields_form[4]['form'] = array(
-      'legend' => array(
-        'title' => $this->l('Opções Adicionais'),
-      ),
-      'input' => array(
-        array(
-          'type' => 'radio',
-          'label' => $this->l('Habilitar Máscara de Campos'),
-          'name' => $this->name.'mask_fields',
-          'required' => true,
-          'values' => array(
-            array(
-              'id' => 'mask_on',
-              'value' => 'on',
-              'label' => $this->l('Ativado'),
-            ),
-            array(
-              'id' => 'mask_off',
-              'value' => 'off',
-              'label' => $this->l('Desativado'),
-            ),
-          )
-        ),
-        array(
-          'type' => 'radio',
-          'label' => $this->l('Habilitar Preenchimento Automático de Endereço'),
-          'name' => $this->name.'fill_address',
-          'required' => true,
-          'values' => array(
-            array(
-              'id' => 'fill_address_on',
-              'value' => 'on',
-              'label' => $this->l('Ativado'),
-            ),
-            array(
-              'id' => 'fill_address_off',
-              'value' => 'off',
-              'label' => $this->l('Desativado'),
-            ),
-          )
-        ),
-      )
-    );
-
-
-    $fields_form[5]['form'] = array(
-      'legend' => array(
-        'title' => $this->l('Informações da Transportadora'),
-      ),
-      'input' => array(
-        array(
-          'type' => 'radio',
-          'hint' => 'Incluir dados da transportadora em pedidos enviados com o método configurado',
-          'label' => $this->l('Incluir dados da transportadora na NF-e'),
-          'name' => $this->name.'transp_include',
-          'required' => true,
-          'values' => array(
-            array(
-              'id' => 'include_on',
-              'value' => 'on',
-              'label' => $this->l('Ativado'),
-            ),
-            array(
-              'id' => 'include_off',
-              'value' => 'off',
-              'label' => $this->l('Desativado'),
-            ),
-          )
-        ),
-        array(
-          'type' => 'select',
-          'label' => $this->l('Método de Entrega'),
-          'name' => $this->name.'transp_method',
-          'options' => array(
-            'query' => $this->get_shipping_methods_options(),
-            'id' => 'id_option',
-            'name' => 'name'
-          )
-
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('Razão Social'),
-          'name' => $this->name.'transp_rs',
-          'size' => 50,
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('CNPJ'),
-          'name' => $this->name.'transp_cnpj',
-          'size' => 50,
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('Inscrição Estadual'),
-          'name' => $this->name.'transp_ie',
-          'size' => 50,
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('Endereço'),
-          'name' => $this->name.'transp_address',
-          'size' => 50,
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('CEP'),
-          'name' => $this->name.'transp_cep',
-          'size' => 50,
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('Cidade'),
-          'name' => $this->name.'transp_city',
-          'size' => 50,
-        ),
-        array(
-          'type' => 'text',
-          'label' => $this->l('UF'),
-          'name' => $this->name.'transp_uf',
-          'size' => 50,
-        ),
-      ),
-
-    );
-
-    $fields_form[6]['form'] = array(
-      'legend' => array(
-        'title' => $this->l('Salvar alteraçoes')
-      ),
-      'submit' => array(
-        'title' => $this->l('Salvar'),
-        'class' => 'button'
-      )
-    );
-
-
-
-
-    $helper = new HelperForm();
-
-    $helper->module = $this;
-    $helper->name_controller = $this->name;
-    $helper->token = Tools::getAdminTokenLite('AdminModules');
-    $helper->allow_employee_form_lang = $default_language;
-
-    $helper->title = $this->displayName;
-    $helper->show_toolbar = true;
-    $helper->toolbar_scroll = true;
-    $helper->submit_action = 'submit'.$this->name;
-    if(_MAIN_PS_VERSION_ == '1.5'){
-      $helper->currentIndex = AdminController::$currentIndex.'&configure='.$this->name;
-    }
-    $helper->toolbar_btn = array(
-      'save' =>
-      array(
-        'desc' => $this->l('Salvar'),
-        'href' => AdminController::$currentIndex.'&configure='.$this->name.'&save'.$this->name.'&token='.Tools::getAdminTokenLite('AdminModules'),
-      ),
-      'back' => array(
-        'href' => AdminController::$currentIndex.'&token='.Tools::getAdminTokenLite('AdminModules'),
-        'desc' => $this->l('Voltar para a listagem')
-      )
-    );
-
-    $helper->fields_value = $this->getConfigFieldsValues();
-
-    return $helper->generateForm($fields_form).'<span class="teste"></span>';
+    require __DIR__ . '/views/templates/settings-page.php';
+    return ob_get_clean();
   }
 
-  /**
-  * Get module configs values
-  */
   public function getConfigFieldsValues(){
 
     return array(
-      $this->name.'consumer_key' => Configuration::get($this->name.'consumer_key'),
-      $this->name.'consumer_secret' => Configuration::get($this->name.'consumer_secret'),
-      $this->name.'access_token' => Configuration::get($this->name.'access_token'),
-      $this->name.'access_token_secret' => Configuration::get($this->name.'access_token_secret'),
+      $this->name.'consumer_key' => '',
+      $this->name.'consumer_secret' => '',
+      $this->name.'access_token' => '',
+      $this->name.'access_token_secret' => '',
       $this->name.'sefaz_env' => Configuration::get($this->name.'sefaz_env'),
       $this->name.'automatic_emit' => Configuration::get($this->name.'automatic_emit'),
       $this->name.'auto_emit_status_ids' => Configuration::get($this->name.'auto_emit_status_ids'),
@@ -1088,7 +663,6 @@ class WebmaniaBrNFe extends Module{
       $this->name.'valor_pessoa_fisica' => '',
       $this->name.'valor_pessoa_juridica' => '',
       $this->name.'bairro_status' => 'off',
-      $this->name.'bairro_status' => md5(uniqid(rand(), true)),
       $this->name.'envio_email' => 'on',
       $this->name.'transp_include'      => 'off',
       $this->name.'transp_method'      => '',
@@ -1135,6 +709,8 @@ class WebmaniaBrNFe extends Module{
   }
 
   public function hookBackOfficeHeader($params = null){
+    $this->ensureAjaxController();
+
 
     $this->listen_notification();
 
@@ -1156,8 +732,9 @@ class WebmaniaBrNFe extends Module{
       $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
       $numero_enabled = Configuration::get($this->name.'numero_compl_status');
 
+      // Same ACL as the AJAX resources: customer documents and address data are personal data.
       $edit_id_customer = Tools::getValue('id_customer') ?: Tools::getValue('customerId');
-      if($edit_id_customer){
+      if($edit_id_customer && $this->employeeCan('AdminCustomers', 'view')){
         Media::addJsDef(array('id_customer_wmbr' => $edit_id_customer));
 
         $doc = Db::getInstance()->getRow('SELECT nfe_document_number, nfe_document_type, nfe_razao_social, nfe_pj_ie FROM '._DB_PREFIX_.'customer WHERE id_customer = '.(int)$edit_id_customer);
@@ -1172,7 +749,7 @@ class WebmaniaBrNFe extends Module{
       }
 
       $edit_id_address = Tools::getValue('id_address') ?: Tools::getValue('addressId');
-      if($edit_id_address){
+      if($edit_id_address && $this->employeeCan('AdminAddresses', 'view')){
         Media::addJsDef(array('id_address_wmbr' => $edit_id_address));
 
         $addr = Db::getInstance()->getRow('SELECT address_number, bairro FROM '._DB_PREFIX_.'address WHERE id_address = '.(int)$edit_id_address);
@@ -1188,9 +765,11 @@ class WebmaniaBrNFe extends Module{
       Media::addJsDef(array('tipo_pessoa_enabled' => $cpf_cnpj_status));
       Media::addJsDef(array('numero_enabled' => $numero_enabled));
 
+      Media::addJsDef(array('wmbr_admin_ajax_url' => $this->context->link->getAdminLink('AdminWebmaniaNfeAjax') . '&ajax=1'));
       Media::addJsDef(array('wmbr_module_path' => __PS_BASE_URI__.'modules/'.$this->name.'/'));
 
-      Media::addJsDef(array('sec_token' => Tools::getAdminToken('7Br2ZZwaRD')));
+      Media::addJsDef(array('sec_token' => Tools::getAdminTokenLite('AdminWebmaniaNfeAjax')));
+      $this->context->controller->addJS($this->_path.'/js/emission-recovery.js?v='.$this->version, 'all');
 
       if (_PS_VERSION_ >= '1.7.7') {
         $this->context->controller->addJS($this->_path.'/js/scripts_bo.1.7.7.js?v='.$this->version, 'all');
@@ -1237,12 +816,12 @@ class WebmaniaBrNFe extends Module{
 
   public function hookDisplayInvoice($params = null) {
 
-    $order_id = $params['id_order'];
+    $order_id = (int) $params['id_order'];
     $order = new Order($order_id);
 
     $this->display_order_nfe_table($order_id);
 
-    if(Tools::getValue('nfe-transporte-info')){
+    if($this->canSaveTransportInfo()){
       $this->save_order_transporte_info($order_id);
     }
 
@@ -1300,12 +879,13 @@ class WebmaniaBrNFe extends Module{
 
 
   public function display_order_nfe_table($order_id){
-
+    $order_id = (int) $order_id;
+    echo $this->displayEmissionRecovery($order_id);
     $order_id = (int) $order_id;
     $order = new Order($order_id);
     $customer = $order->getCustomer();
 
-    $nfe_info = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $order_id" ));
+    $nfe_info = WebmaniaNFeSecurity::invoices(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $order_id" ));
 
     $url  = 'index.php?controller=AdminOrders&id_order='.$order_id;
     $url .= '&vieworder&token='.Tools::getAdminTokenLite('AdminOrders');
@@ -1352,10 +932,10 @@ class WebmaniaBrNFe extends Module{
 
       //Set danfe simples/etiqueta url if it doesn't exist
       foreach ($nfe_info as $key => $nfe) {
-        if (!$nfe['url_danfe_simplificada']) {
+        if (empty($nfe['url_danfe_simplificada'])) {
           $nfe_info[$key]['url_danfe_simplificada'] = str_replace('/danfe/', '/danfe/simples/', $nfe['url_danfe']);
         }
-        if (!$nfe['url_danfe_etiqueta']) {
+        if (empty($nfe['url_danfe_etiqueta'])) {
           $nfe_info[$key]['url_danfe_etiqueta'] = str_replace('/danfe/', '/danfe/etiqueta/', $nfe['url_danfe']);
         }
         $password = !empty($nfe['documento']) ? $nfe['documento'] : $document;
@@ -1387,10 +967,11 @@ class WebmaniaBrNFe extends Module{
       $invoice_address_id = $order->id_address_invoice;
 
       $address_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$delivery_address_id);
-      $state = new State($address_custom['id_state']);
+      if (!is_array($address_custom)) { $address_custom = array(); }
+      $state = new State(isset($address_custom['id_state']) ? (int) $address_custom['id_state'] : 0);
       $this->context->smarty->assign(array(
-        'user_address_info' => $address_custom,
-        'state' => $state->iso_code,
+        'user_address_info' => array_merge(array_fill_keys(array('firstname', 'lastname', 'address1', 'address_number', 'address2', 'postcode', 'city', 'phone'), ''), array_map('strval', $address_custom)),
+        'state' => (string) $state->iso_code,
       ));
 
       echo $this->display(__FILE__, 'user_address_info.tpl');
@@ -1404,7 +985,7 @@ class WebmaniaBrNFe extends Module{
     $transporte_info = $this->get_order_transporte_info($order_id);
 
     $this->context->smarty->assign(array(
-      'transporte_info' => $transporte_info,
+      'transporte_info' => is_array($transporte_info) ? array_map('strval', $transporte_info) : array(),
     ));
 
     echo $this->display(__FILE__, 'nfe_transporte_info.tpl');
@@ -1423,7 +1004,7 @@ class WebmaniaBrNFe extends Module{
       'nfe_peso_liquido' => pSQL(Tools::getValue('nfe_peso_liquido')),
       'nfe_valor_seguro' => pSQL(Tools::getValue('nfe_valor_seguro')),
     ),'id_order = ' .$order_id )){
-      $this->context->controller->_errors[] = 'Error: '.Db::getInstance()->getMsgError();
+      $this->_errors[] = 'Error: '.Db::getInstance()->getMsgError();
     }
 
   }
@@ -1489,7 +1070,7 @@ class WebmaniaBrNFe extends Module{
 
 
       $this->setJSCustomFieldsStatus();
-      Media::addJsDef(array('sec_token' => Tools::getAdminToken('7Br2ZZwaRD')));
+      Media::addJsDef(array('sec_token' => Tools::getToken(false)));
 
       $this->context->controller->addJS($this->_path.'/js/scripts_fo.'._MAIN_PS_VERSION_.'.js', 'all');
 
@@ -1522,10 +1103,8 @@ class WebmaniaBrNFe extends Module{
 
   public function hookActionPaymentConfirmation($params = null){
 
-    $orderID = $params['id_order'];
-    $automatic = Configuration::get($this->name.'automatic_emit');
-    if($automatic == 'on'){
-      $this->emitirNfe($orderID);
+    if (isset($params['id_order'])) {
+      $this->emitirNfeAutomatico($params['id_order']);
     }
     return true;
 
@@ -1534,25 +1113,26 @@ class WebmaniaBrNFe extends Module{
   public function hookDisplayAdminProductsExtra($params = null){
 
     $product_id = (int)Tools::getValue('id_product');
-    if(!$product_id) $product_id = $params['id_product'];
+    if(!$product_id && isset($params['id_product'])) $product_id = (int) $params['id_product'];
+
+    // Templates escape these values: always assign strings (NULL columns, product not loaded).
+    $columns = array('tax_class' => 'nfe_tax_class', 'ean_bar_code' => 'nfe_ean_bar_code', 'gtin_tributavel' => 'nfe_gtin_tributavel',
+      'ncm_code' => 'nfe_ncm_code', 'cest_code' => 'nfe_cest_code', 'cnpj_fabricante' => 'nfe_cnpj_fabricante',
+      'ind_escala' => 'nfe_ind_escala', 'product_source' => 'nfe_product_source', 'ignorar_nfe' => 'nfe_ignorar_nfe');
+    $assign = array_fill_keys(array_keys($columns), '');
 
     if(Validate::isLoadedObject($product = new Product($product_id))){
 
       $values = $this->getProductNfeValues( $product_id );
-
-      $this->context->smarty->assign(array(
-        'tax_class' => $values[0]['nfe_tax_class'],
-        'ean_bar_code' => $values[0]['nfe_ean_bar_code'],
-        'gtin_tributavel' => $values[0]['nfe_gtin_tributavel'],
-        'ncm_code' => $values[0]['nfe_ncm_code'],
-        'cest_code' => $values[0]['nfe_cest_code'],
-        'cnpj_fabricante' => $values[0]['nfe_cnpj_fabricante'],
-        'ind_escala' => $values[0]['nfe_ind_escala'],
-        'product_source' => $values[0]['nfe_product_source'],
-        'ignorar_nfe' => $values[0]['nfe_ignorar_nfe']
-      ));
+      if (is_array($values) && isset($values[0]) && is_array($values[0])) {
+        foreach ($columns as $variable => $column) {
+          $assign[$variable] = isset($values[0][$column]) ? (string) $values[0][$column] : '';
+        }
+      }
 
     }
+
+    $this->context->smarty->assign($assign);
 
     if(_MAIN_PS_VERSION_ == '1.5'){
       return $this->display(__FILE__, 'nfe_product_tab.1.5.tpl');
@@ -1565,28 +1145,29 @@ class WebmaniaBrNFe extends Module{
   }
 
   public function hookActionProductUpdate($params = null){
-
     $id_product = (int) Tools::getValue('id_product');
-    if(!Db::getInstance()->update('product', array(
-      'nfe_tax_class'=> pSQL(Tools::getValue('nfe_tax_class')),
-      'nfe_ean_bar_code' => pSQL(Tools::getValue('nfe_ean_bar_code')),
-      'nfe_gtin_tributavel' => pSQL(Tools::getValue('nfe_gtin_tributavel')),
-      'nfe_ncm_code' => pSQL(Tools::getValue('nfe_ncm_code')),
-      'nfe_cest_code' => pSQL(Tools::getValue('nfe_cest_code')),
-      'nfe_cnpj_fabricante' => pSQL(Tools::getValue('nfe_cnpj_fabricante')),
-      'nfe_ind_escala' => pSQL(Tools::getValue('nfe_ind_escala')),
-      'nfe_product_source' => pSQL(Tools::getValue('nfe_product_source')),
-      'nfe_ignorar_nfe' => pSQL(Tools::getValue('nfe_ignorar_nfe'))
-    ),'id_product = ' .$id_product )){
-      $this->context->controller->_errors[] = 'Error: '.Db::getInstance()->getMsgError();
+    if (!$id_product) { return; }
+    $fields = array('nfe_tax_class', 'nfe_ean_bar_code', 'nfe_gtin_tributavel', 'nfe_ncm_code',
+      'nfe_cest_code', 'nfe_cnpj_fabricante', 'nfe_ind_escala', 'nfe_product_source', 'nfe_ignorar_nfe');
+    $update = array();
+    foreach ($fields as $field) {
+      if (!Tools::getIsset($field)) { continue; }
+      $value = Tools::getValue($field);
+      if (is_scalar($value)) { $update[$field] = pSQL((string) $value); }
     }
-
+    if ($update && !Db::getInstance()->update('product', $update, 'id_product = '.$id_product)) {
+      $this->_errors[] = 'Error: '.Db::getInstance()->getMsgError();
+    }
   }
 
-
-
-
   public function createCustomerDocument( $customer_id, $customer_data ) {
+
+    // Registrations without the document fields (disabled option, other modules) must not warn.
+    $customer_data = is_array($customer_data) ? $customer_data : array();
+    foreach (array('document_type', 'cpf', 'cnpj', 'razao_social', 'cnpj_ie') as $field) {
+      $customer_data[$field] = isset($customer_data[$field]) && is_scalar($customer_data[$field]) ? (string) $customer_data[$field] : '';
+    }
+    $DB_data = array();
 
     if($customer_data['document_type'] == 'cpf'){
       $DB_data = array(
@@ -1596,14 +1177,18 @@ class WebmaniaBrNFe extends Module{
     }elseif($customer_data['document_type'] == 'cnpj'){
       $DB_data = array(
         'nfe_document_type'   => pSQL($customer_data['document_type']),
-        'nfe_document_number' => pSQL(preg_replace("/[^0-9]/", "", $customer_data['cnpj'])),
+        'nfe_document_number' => pSQL(WebmaniaNFeSecurity::normalizeDocument($customer_data['cnpj'])),
         'nfe_razao_social'    => pSQL($customer_data['razao_social']),
         'nfe_pj_ie'           => pSQL($customer_data['cnpj_ie']),
       );
     }
 
-    if(!Db::getInstance()->update('customer', $DB_data, 'id_customer = ' .$customer_id )){
-      $this->context->controller->_errors[] = 'Error: '.Db::getInstance()->getMsgError();
+    if(!$DB_data){
+      return;
+    }
+
+    if(!Db::getInstance()->update('customer', $DB_data, 'id_customer = ' .(int)$customer_id )){
+      $this->_errors[] = 'Error: '.Db::getInstance()->getMsgError();
     }
 
   }
@@ -1611,17 +1196,12 @@ class WebmaniaBrNFe extends Module{
   public function hookActionCustomerAccountAdd($params = null){
 
     $customer_data = array();
-    $customer_id = (int)$params['newCustomer']->id;
+    $customer_id = isset($params['newCustomer']->id) ? (int)$params['newCustomer']->id : 0;
+    if (!$customer_id) { return; }
 
     if(_MAIN_PS_VERSION_ == '1.6'){
-      $data = $params['_POST'];
-      $customer_data = array(
-        'document_type' => $data['document_type'],
-        'cpf'           => $data['cpf'],
-        'cnpj'          => $data['cnpj'],
-        'razao_social'  => $data['razao_social'],
-        'cnpj_ie'       => $data['cnpj_ie'],
-      );
+      // createCustomerDocument() normalizes missing or malformed fields.
+      $customer_data = isset($params['_POST']) && is_array($params['_POST']) ? $params['_POST'] : array();
     }else if(_MAIN_PS_VERSION_ == '1.7'){
       $customer_data = array(
         'document_type' => Tools::getValue('document_type'),
@@ -1889,7 +1469,7 @@ class WebmaniaBrNFe extends Module{
 
     }elseif($customer_data['document_type'] == 'cnpj'){
       $document_type = pSQL($customer_data['document_type']);
-      $document_number = pSQL(preg_replace("/[^0-9]/","",$customer_data['cnpj']));
+      $document_number = pSQL(WebmaniaNFeSecurity::normalizeDocument($customer_data['cnpj']));
       $razao_social = pSQL($customer_data['razao_social']);
       $cnpj_ie = pSQL($customer_data['cnpj_ie']);
 
@@ -1903,31 +1483,26 @@ class WebmaniaBrNFe extends Module{
 
   public function hookActionCategoryUpdate($params = null) {
 
-    $category_id = Tools::getValue('id_category');
+    $category_id = (int) Tools::getValue('id_category');
     $values = Tools::getAllValues();
-    $ncm = '';
+    $ncm = null;
 
     foreach($values as $key => $value){
 
-      if( strpos($key, 'nfe_category_ncm') !== false ){
-        $ncm = pSQL($value);
+      if( strpos((string) $key, 'nfe_category_ncm') !== false ){
+        $ncm = is_scalar($value) ? pSQL((string) $value) : '';
         break;
       }
 
     }
 
-    $update_values = array(
-      'nfe_category_ncm' => $ncm
-    );
+    // Category::update() is also called by status toggles and other modules without the NCM field.
+    if( $category_id && $ncm !== null ){
 
-
-    if( $category_id ){
-
-      $query = "UPDATE ". _DB_PREFIX_ ."category SET nfe_category_ncm = '".$ncm."' WHERE id_category = " . $category_id;
-      $result = Db::getInstance()->update( 'category', $update_values, 'id_category = ' .(int)$category_id );
+      $result = Db::getInstance()->update( $this->categoryNcmTable(), array('nfe_category_ncm' => $ncm), 'id_category = ' .$category_id );
 
       if(!$result){
-        $this->errors[] = Db::getInstance()->getMsgError();
+        $this->_errors[] = Db::getInstance()->getMsgError();
       }
 
     }
@@ -1939,17 +1514,18 @@ class WebmaniaBrNFe extends Module{
 
     $number_status = Configuration::get($this->name.'numero_compl_status');
     $update_values = array();
-    $context_type = Context::getContext()->controller->controller_type;
 
     if($number_status == 'on'){
-      $number = Tools::getValue('address_number');
+      $number_field = 'address_number';
     }else{
-      $number = Tools::getValue(Configuration::get($this->name.'numero_field'));
+      $number_field = (string) Configuration::get($this->name.'numero_field');
     }
 
-    $update_values = array(
-      'address_number'=> pSQL($number),
-    );
+    // Only forms that submit the number may change it (webservice/import/other modules do not).
+    if($number_field !== '' && Tools::getIsset($number_field)){
+      $number = Tools::getValue($number_field);
+      $update_values['address_number'] = is_scalar($number) ? pSQL((string) $number) : '';
+    }
 
     if(_MAIN_PS_VERSION_ == '1.7'){
 
@@ -1960,8 +1536,8 @@ class WebmaniaBrNFe extends Module{
         $bairro = Tools::getValue(Configuration::get($this->name.'bairro_field'));
       }
 
-      if($bairro){
-        $update_values['bairro'] = pSQL($bairro);
+      if($bairro && is_scalar($bairro)){
+        $update_values['bairro'] = pSQL((string) $bairro);
       }
 
     }
@@ -1969,7 +1545,7 @@ class WebmaniaBrNFe extends Module{
 
     if(!empty($update_values)){
       if(!Db::getInstance()->update('address', $update_values, 'id_address = ' .(int)$address_id)){
-        $this->errors[] = Db::getInstance()->getMsgError();
+        $this->_errors[] = Db::getInstance()->getMsgError();
       }
     }
 
@@ -2004,7 +1580,6 @@ class WebmaniaBrNFe extends Module{
 
     $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
     $update_values = array();
-    $context_type = Context::getContext()->controller->controller_type;
 
     if ($cpf_cnpj_status == 'on'){
       $fields = array(
@@ -2022,31 +1597,37 @@ class WebmaniaBrNFe extends Module{
       );
     }
 
+    // Read each submitted value once; arrays from crafted requests are ignored.
+    $values = array();
+    foreach ($fields as $key => $name) {
+      $value = $name ? Tools::getValue($name) : false;
+      $values[$key] = is_scalar($value) ? (string) $value : '';
+    }
+
     // Set user
-    $is_cnpj = str_replace( array('/', '.', '-'), '', Tools::getValue($fields['cnpj']));
-    if ($is_cnpj && strlen($is_cnpj) == 14) $is_cnpj = true; else $is_cnpj = false;
+    $is_cnpj = WebmaniaNFeSecurity::validCnpj($values['cnpj']);
 
     if ($is_cnpj){
 
-      if (Tools::getValue($fields['cnpj'])){
+      if ($values['cnpj']){
 
         $update_values['nfe_document_type'] = 'cnpj';
-        $update_values['nfe_document_number'] = preg_replace("/[^0-9]/","", Tools::getValue($fields['cnpj']));
+        $update_values['nfe_document_number'] = pSQL(WebmaniaNFeSecurity::normalizeDocument($values['cnpj']));
 
-        if (Tools::getValue($fields['razao_social'])) $update_values['nfe_razao_social'] = pSQL(Tools::getValue($fields['razao_social']));
+        if ($values['razao_social']) $update_values['nfe_razao_social'] = pSQL($values['razao_social']);
         else $update_values['nfe_razao_social'] = '';
 
-        if (Tools::getValue($fields['ie'])) $update_values['nfe_pj_ie'] = pSQL(Tools::getValue($fields['ie']));
+        if ($values['ie']) $update_values['nfe_pj_ie'] = pSQL($values['ie']);
         else $update_values['nfe_pj_ie'] = '';
 
       }
 
     } else {
 
-      if (Tools::getValue($fields['cpf'])){
+      if ($values['cpf']){
 
         $update_values['nfe_document_type'] = 'cpf';
-        $update_values['nfe_document_number'] = preg_replace("/[^0-9]/","", Tools::getValue($fields['cpf']));
+        $update_values['nfe_document_number'] = preg_replace("/[^0-9]/","", $values['cpf']);
         $update_values['nfe_razao_social'] = '';
         $update_values['nfe_pj_ie'] = '';
 
@@ -2090,7 +1671,7 @@ class WebmaniaBrNFe extends Module{
     if(!empty($update_values)){
 
       if(!Db::getInstance()->update('customer', $update_values, 'id_customer="'.(int)$customer_id.'"')){
-        $this->errors[] = Db::getInstance()->getMsgError();
+        $this->_errors[] = Db::getInstance()->getMsgError();
       }
 
     }
@@ -2177,7 +1758,7 @@ class WebmaniaBrNFe extends Module{
       }
       if (empty($ids)) { $ids = array(3,4,5); }
       if (in_array((int)$new_order_status->id, $ids, true)) {
-        $this->emitirNfe($order_id);
+        $this->emitirNfeAutomatico($order_id);
       }
     }
   }
@@ -2186,13 +1767,11 @@ class WebmaniaBrNFe extends Module{
    * Hook for PrestaShop 9+ validate order after
    */
   public function hookActionValidateOrderAfter($params) {
-    if ($this->isPrestaShop9Plus()) {
-      $order_id = $params['order']->id;
-      $automatic = Configuration::get($this->name.'automatic_emit');
-      
-      if($automatic == 'on') {
-        $this->emitirNfe($order_id);
-      }
+    // "Emissão automática" is documented as "sempre que um pagamento for confirmado":
+    // unpaid orders (boleto, transfer) must not receive an authorized NF-e at checkout.
+    if ($this->isPrestaShop9Plus() && isset($params['order']) && is_object($params['order']) &&
+        method_exists($params['order'], 'hasBeenPaid') && $params['order']->hasBeenPaid()) {
+      $this->emitirNfeAutomatico($params['order']->id);
     }
   }
   /*********************** END HOOKED FUNCTIONS **************************/
@@ -2235,6 +1814,8 @@ class WebmaniaBrNFe extends Module{
   }
 
   public function getOrderData($orderID){
+    $orderID = (int) $orderID;
+
 
     $order = new Order($orderID);
 
@@ -2245,7 +1826,7 @@ class WebmaniaBrNFe extends Module{
 
     $uniq_key = Configuration::get($this->name.'uniq_key');
     if(!$uniq_key){
-      $uniq_key = md5(uniqid(rand(), true));
+      $uniq_key = WebmaniaNFeSecurity::randomToken();
       Configuration::updateValue($this->name.'uniq_key', $uniq_key);
     }
 
@@ -2274,6 +1855,8 @@ class WebmaniaBrNFe extends Module{
 
     if ($bairro_status == 'on') $fields['bairro'] = 'bairro';
     else $fields['bairro'] = Configuration::get($this->name.'bairro_field');
+    // Configured names may be empty or absent from the tables; never use them as null offsets.
+    $fields = array_map('strval', $fields);
 
     // Search Database
     $address = new Address($order->id_address_delivery);
@@ -2282,6 +1865,9 @@ class WebmaniaBrNFe extends Module{
 
     $customer_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
     $address_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'address WHERE id_address = ' . (int)$address->id);
+    if (!is_array($customer_custom)) { $customer_custom = array(); }
+    if (!is_array($address_custom)) { $address_custom = array(); }
+    $numero = isset($address_custom[$fields['address_number']]) ? $address_custom[$fields['address_number']] : null;
 
     // Set Document Type
     /*$is_cnpj = str_replace( array('/', '.', '-'), '', $customer_custom[$fields['cnpj']]);
@@ -2292,7 +1878,7 @@ class WebmaniaBrNFe extends Module{
     $data = array(
         'ID' => $order->id, // Número do pedido
         'origem' => 'prestashop_1.x',
-        'url_notificacao' => Tools::getHttpHost(true).__PS_BASE_URI__.'?retorno_nfe='.$uniq_key.'&order_id='.$order->id,
+        'url_notificacao' => $this->notificationUrl($uniq_key, $order->id),
         'operacao' => 1, // Tipo de Operação da Nota Fiscal
         'natureza_operacao' => Configuration::get($this->name.'operation_type'), // Natureza da Operação
         'modelo' => 1, // Modelo da Nota Fiscal (NF-e ou NFC-e)
@@ -2356,7 +1942,8 @@ class WebmaniaBrNFe extends Module{
        $cnpj = $this->cnpj($customer_docs['cnpj']);
        if( !$cnpj && isset($customer->cnpj) ) $cnpj = $customer->cnpj;
 
-       if (!$customer_custom[$fields['razao_social']]) $razao_social = $customer->firstname.' '.$customer->lastname;
+       // The configured field (default "razao_social") is usually not a customer column.
+       if (empty($customer_custom[$fields['razao_social']])) $razao_social = $customer->firstname.' '.$customer->lastname;
        else $razao_social = $customer_custom[$fields['razao_social']];
 
        $data['cliente'] = array(
@@ -2365,7 +1952,7 @@ class WebmaniaBrNFe extends Module{
          'ie'           => $customer_docs['ie'], // (pessoa jurídica) Número da Inscrição Estadual
          'endereco'     => $address->address1, // Endereço de entrega dos produtos
          'complemento'  => $address->other, // Complemento do endereço de entrega
-         'numero'       => $address_custom[$fields['address_number']], // Número do endereço de entrega
+         'numero'       => $numero, // Número do endereço de entrega
          'bairro'       => $address->address2, // Bairro do endereço de entrega
          'cidade'       => $address->city, // Cidade do endereço de entrega
          'uf'           => $state->iso_code, // Estado do endereço de entrega
@@ -2384,7 +1971,7 @@ class WebmaniaBrNFe extends Module{
          'nome_completo' => $customer->firstname.' '.$customer->lastname, // (pessoa fisica) Nome completo
          'endereco' => $address->address1, // Endereço de entrega dos produtos
          'complemento' => $address->other, // Complemento do endereço de entrega
-         'numero' => $address_custom[$fields['address_number']], // Número do endereço de entrega
+         'numero' => $numero, // Número do endereço de entrega
          'bairro' => $address->address2, // Bairro do endereço de entrega
          'cidade' => $address->city, // Cidade do endereço de entrega
          'uf' => $state->iso_code, // Estado do endereço de entrega
@@ -2396,7 +1983,7 @@ class WebmaniaBrNFe extends Module{
 
      if (_MAIN_PS_VERSION_ == '1.7'){
 
-       $data['cliente']['bairro'] = ($fields['bairro']) ? $address_custom[$fields['bairro']] : '';
+       $data['cliente']['bairro'] = ($fields['bairro'] && isset($address_custom[$fields['bairro']])) ? $address_custom[$fields['bairro']] : '';
 
        if (!$data['cliente']['bairro']) {
 
@@ -2567,12 +2154,14 @@ class WebmaniaBrNFe extends Module{
   function get_category_ncm( $id_category ){
 
     $ncm = false;
+    $id_category = (int) $id_category;
     $category_obj = new CategoryCore($id_category);
 
-    $category_ncm = Db::getInstance()->ExecuteS("SELECT nfe_category_ncm   FROM "._DB_PREFIX_."category WHERE id_category = $id_category" );
+    // PS 1.6 keeps the column in category_lang (see getColumnsToAdd); a failed query returns false.
+    $category_ncm = Db::getInstance()->ExecuteS('SELECT nfe_category_ncm FROM '._DB_PREFIX_.$this->categoryNcmTable().' WHERE id_category = '.$id_category);
 
-    foreach($category_ncm as $ncm_query){
-      if($ncm_query['nfe_category_ncm']){
+    foreach(is_array($category_ncm) ? $category_ncm : array() as $ncm_query){
+      if(!empty($ncm_query['nfe_category_ncm'])){
         $ncm = $ncm_query['nfe_category_ncm'];
       }
     }
@@ -2633,12 +2222,14 @@ class WebmaniaBrNFe extends Module{
     $active_value = Configuration::get($name);
 
 
-    $tables = Db::getInstance()->executeS("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'");
+    // Only the shop database (other schemas on the same server are not readable by the mapping).
+    $tables = Db::getInstance()->executeS("SELECT TABLE_NAME AS TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_SCHEMA = DATABASE()");
     $html = '<select name="'.$name.'" class="nfe-docs--column" id="'.$name.'">';
     $html .= '<option value="">Selecionar</option>';
 
-    foreach($tables as $table){
+    foreach(is_array($tables) ? $tables : array() as $table){
 
+      if(!isset($table['TABLE_NAME']) || !$this->isSqlIdentifier($table['TABLE_NAME'])) continue;
       $selected = '';
       if($table['TABLE_NAME'] == $active_value){
         $selected = 'selected';
@@ -2659,14 +2250,17 @@ class WebmaniaBrNFe extends Module{
     $name = 'webmaniabrnfedocscolumn_'.$name;
     $active_value = Configuration::get($name);
 
-    if($active_table){
-      $results = Db::getInstance()->executeS("SELECT column_name from information_schema.columns where table_name = '$active_table'");
+    // The saved table name is admin input (isGenericName allows quotes): validate it before querying.
+    if($active_table && $this->isSqlIdentifier($active_table)){
+      // MySQL 8 returns information_schema columns in upper case unless aliased.
+      $results = Db::getInstance()->executeS("SELECT column_name AS column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '".pSQL($active_table)."'");
 
       $html = '<select name="'.$name.'">';
       $html .= '<option value="">Selecionar</option>';
 
-      foreach($results as $column){
+      foreach(is_array($results) ? $results : array() as $column){
 
+        if(!isset($column['column_name']) || !$this->isSqlIdentifier($column['column_name'])) continue;
         $selected = '';
         if($column['column_name'] == $active_value){
           $selected = 'selected';
@@ -2688,94 +2282,206 @@ class WebmaniaBrNFe extends Module{
 
   }
 
-  public function emitirNfe($orderID){
+  private function recoveryOrderAccessible($orderId) {
+    $shops = array_filter(array_map('intval', Shop::getContextListShopID()));
+    return $shops && (bool) Db::getInstance()->getValue('SELECT id_order FROM '._DB_PREFIX_.'orders WHERE id_order = '.(int) $orderId.
+      ' AND id_shop IN ('.implode(',', $shops).')', false);
+  }
 
+  /** Display recovery on the order itself, including orders whose first response was lost. */
+  public function displayEmissionRecovery($orderId) {
+    if (!$this->employeeCan('AdminOrders', 'edit') || !$this->recoveryOrderAccessible($orderId)) { return ''; }
+    $reservation = WebmaniaNFeEmission::current($orderId);
+    if (!$reservation || $reservation['phase'] !== 'dispatching') { return ''; }
+    $this->context->smarty->assign(array('wmbr_recovery' => array(
+      'order_id' => (int) $orderId,
+      'key' => hash('sha256', $reservation['token']),
+      'has_uuid' => WebmaniaNFeSecurity::validUuid($reservation['uuid']),
+      'url' => $this->context->link->getAdminLink('AdminWebmaniaNfeAjax').'&ajax=1',
+      'csrf' => Tools::getAdminTokenLite('AdminWebmaniaNfeAjax')
+    )));
+    return $this->display(__FILE__, 'emission_recovery.tpl');
+  }
+
+  /** Recovery never emits a new invoice. Unknown API results keep the reservation. */
+  public function recoverEmission($orderId, $key, $confirmAbsent = false) {
+    $failure = array('success' => false, 'message' => 'Não foi possível recuperar esta tentativa. Atualize o pedido e consulte a Webmania.');
+    require_once __DIR__.'/sdk/Ajax.php';
+    if (!isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'POST' ||
+        !WebmaniaNFeAjax::authorized($this->context, 'recoverEmission', Tools::getValue('adminToken'), true) ||
+        !$this->employeeCan('AdminOrders', 'edit') || !is_scalar($orderId) || !ctype_digit((string) $orderId) || (int) $orderId < 1 ||
+        !is_string($key) || !preg_match('/^[a-f0-9]{64}$/D', $key) || !$this->recoveryOrderAccessible($orderId)) { return $failure; }
+    $orderId = (int) $orderId;
+    $reservation = WebmaniaNFeEmission::current($orderId);
+    if (!$reservation || $reservation['phase'] !== 'dispatching' ||
+        !WebmaniaNFeSecurity::equals(hash('sha256', $reservation['token']), $key)) { return $failure; }
+    $uuid = $reservation['uuid'];
+    if ($uuid === '') {
+      if (!is_scalar($confirmAbsent) || (string) $confirmAbsent !== '1') { return $failure; }
+      // Ten minutes exceed the API's five-minute transport timeout. Match all state in the DELETE.
+      if (!WebmaniaNFeEmission::releaseUnidentified($orderId, $reservation['token'])) {
+        return array('success' => false, 'message' => 'Aguarde ao menos 10 minutos após o envio e atualize o pedido. A tentativa continua protegida.');
+      }
+      return array('success' => true, 'message' => 'Tentativa liberada após sua confirmação. Nenhuma nova nota foi emitida.');
+    }
+    if (!WebmaniaNFeSecurity::validUuid($uuid)) { return $failure; }
+    $api = new NFe($this->settings);
+    $response = $api->consultaNotaFiscal($uuid);
+    if (!is_object($response) || isset($response->error) || !isset($response->uuid) || $response->uuid !== $uuid) { return $failure; }
+    $responseId = isset($response->ID) ? $response->ID : (isset($response->data->ID) ? $response->data->ID : null);
+    if ($responseId !== null && ((!is_string($responseId) && !is_int($responseId)) || (string) $responseId !== (string) $orderId)) { return $failure; }
+    if (isset($response->status) && $response->status === 'reprovado') {
+      if (!WebmaniaNFeEmission::release($orderId, $reservation['token'])) { return $failure; }
+      return array('success' => true, 'message' => 'Nota rejeitada. A tentativa foi liberada; revise os dados antes de tentar novamente.');
+    }
+    $document = Db::getInstance()->getValue('SELECT c.nfe_document_number FROM '._DB_PREFIX_.'customer c INNER JOIN '._DB_PREFIX_.
+      'orders o ON o.id_customer = c.id_customer WHERE o.id_order = '.$orderId, false);
+    $client = isset($response->data->cliente) && is_object($response->data->cliente) ? $response->data->cliente : null;
+    if ($client && isset($client->cnpj) && is_scalar($client->cnpj)) { $document = $client->cnpj; }
+    elseif ($client && isset($client->cpf) && is_scalar($client->cpf)) { $document = $client->cpf; }
+    if (!$this->persistNfeResponse($orderId, $response, is_scalar($document) ? (string) $document : '', true, true, $reservation['requested_at']) ||
+        !WebmaniaNFeEmission::release($orderId, $reservation['token'])) { return $failure; }
+    return array('success' => true, 'message' => 'Nota confirmada e recuperada. Nenhuma nova nota foi emitida.');
+  }
+
+  /** Compare-and-swap preserves other invoice updates without relying on a storage engine lock. */
+  private function persistNfeResponse($orderId, $response, $document, $allowInsert, $keepExisting, $issuedAt = null) {
+    if (!is_object($response) || !isset($response->uuid, $response->status) ||
+        !WebmaniaNFeSecurity::validUuid($response->uuid) || !WebmaniaNFeSecurity::validStatus($response->status)) { return false; }
+    $db = Db::getInstance();
+    for ($attempt = 0; $attempt < 5; ++$attempt) {
+      $row = $db->getRow('SELECT nfe_info FROM '._DB_PREFIX_.'orders WHERE id_order = '.(int) $orderId, false);
+      if (!is_array($row) || !array_key_exists('nfe_info', $row)) { return false; }
+      $raw = $row['nfe_info'];
+      $invoices = WebmaniaNFeSecurity::invoices($raw);
+      $found = null;
+      foreach ($invoices as $key => $invoice) {
+        if (isset($invoice['uuid']) && $invoice['uuid'] === $response->uuid) { $found = $key; break; }
+      }
+      if ($found !== null && $keepExisting) { return true; }
+      $values = array();
+      if ($found !== null) {
+        $invoices[$found]['status'] = $response->status;
+      } else {
+        if (!$allowInsert || $response->status === 'reprovado') { return false; }
+        $date = is_string($issuedAt) ? strtotime($issuedAt.' UTC') : false;
+        $invoices[] = array(
+          'uuid' => $response->uuid, 'status' => $response->status, 'chave_acesso' => $response->chave,
+          'n_recibo' => (int) $response->recibo, 'n_nfe' => (int) $response->nfe, 'n_serie' => (int) $response->serie,
+          'url_xml' => $response->xml, 'url_danfe' => $response->danfe,
+          'url_danfe_simplificada' => $response->danfe_simples, 'url_danfe_etiqueta' => $response->danfe_etiqueta,
+          'documento' => WebmaniaNFeSecurity::normalizeDocument($document),
+          'data' => $date === false ? date('d/m/Y') : date('d/m/Y', $date)
+        );
+        $values = array('nfe_numero' => pSQL((string) $response->nfe),
+          'nfe_chave_de_acesso' => pSQL((string) $response->chave), 'nfe_issued' => 1);
+      }
+      $encoded = serialize($invoices);
+      $values['nfe_info'] = pSQL($encoded, true);
+      $condition = 'id_order = '.(int) $orderId.' AND nfe_info <=> '.($raw === null ? 'NULL' : "'".pSQL((string) $raw, true)."'");
+      if (!$db->update('orders', $values, $condition)) { return false; }
+      if ((string) $db->getValue('SELECT nfe_info FROM '._DB_PREFIX_.'orders WHERE id_order = '.(int) $orderId, false) === $encoded) { return true; }
+    }
+    return false;
+  }
+
+  public function emitirNfe($orderID){
+    $orderID = (int) $orderID;
+    if ($orderID < 1) { return array(array('type' => 'error', 'msg' => 'Pedido inválido.')); }
     $isempty = false;
 
     foreach($this->settings as $setting){
       if(empty($setting)){
         $url  = 'index.php?controller=AdminModules&configure=webmaniabrnfe';
         $url .= '&token='.Tools::getAdminTokenLite('AdminModules');
-        $this->context->controller->errors[] = 'Informe as credenciais de acesso antes de emitir a NF-e: <a href="'.$url.'">Configurar</a>';
+        $this->controllerMessage('errors', 'Informe as credenciais de acesso antes de emitir a NF-e: <a href="'.$url.'">Configurar</a>');
         $isempty = true;
         break;
       }
     }
 
-    if($isempty) return true;
+    if($isempty) return array(array('type' => 'error', 'msg' => 'Configure as credenciais antes de emitir a nota fiscal.'));
 
+    if (isset($this->emissionTokens[$orderID])) {
+      return array(array('type' => 'error', 'msg' => 'Já há uma emissão em andamento para este pedido.'));
+    }
+    $token = WebmaniaNFeEmission::acquire($orderID);
+    if (!$token) {
+      return array(array('type' => 'error', 'msg' => 'Já há uma emissão em andamento ou aguardando confirmação para este pedido. Consulte a nota na Webmania antes de repetir.'));
+    }
+    $this->emissionTokens[$orderID] = $token;
+    $this->emissionRelease[$orderID] = true;
+    try {
+      // Another request can save its invoice between the automatic hook's read and acquisition.
+      if (isset($this->automaticEmissionOrders[$orderID]) && WebmaniaNFeSecurity::invoices(
+          Db::getInstance()->getValue('SELECT nfe_info FROM '._DB_PREFIX_.'orders WHERE id_order = '.$orderID, false))) { return array(); }
+      return $this->emitirNfeReservada($orderID, $token);
+    } finally {
+      if ($this->emissionRelease[$orderID]) { WebmaniaNFeEmission::release($orderID, $token); }
+      unset($this->emissionTokens[$orderID], $this->emissionRelease[$orderID]);
+    }
+  }
+
+  private function emitirNfeReservada($orderID, $token){
     $webmaniabr = new NFe($this->settings);
     $data = $this->getOrderData($orderID);
+    if (!is_array($data)) { return array(array('type' => 'error', 'msg' => 'Não foi possível preparar os dados da nota fiscal.')); }
 
-    $response = $webmaniabr->emissaoNotaFiscal( $data );
+    if (!WebmaniaNFeEmission::dispatch($orderID, $token)) {
+      return array(array('type' => 'error', 'msg' => 'Esta tentativa de emissão expirou. Tente novamente.'));
+    }
+    $data['url_notificacao'] = (isset($data['url_notificacao']) && is_string($data['url_notificacao']) ?
+      $data['url_notificacao'] : $this->notificationUrl($this->uniq_key, $orderID));
+    $data['url_notificacao'] .= (strpos($data['url_notificacao'], '?') === false ? '?' : '&').'wmbr_emission_token='.$token;
+    // Persist the possible dispatch before crossing the network. It has no automatic expiry.
+    $this->emissionRelease[$orderID] = false;
+    $response = $webmaniabr->emissaoNotaFiscal($data);
+    if (is_object($response) && isset($response->error) && empty($response->request_uncertain)) {
+      $this->emissionRelease[$orderID] = true;
+    } elseif (is_object($response) && isset($response->status) && $response->status === 'reprovado') {
+      $this->emissionRelease[$orderID] = true;
+    }
+    if (is_object($response) && isset($response->uuid)) { WebmaniaNFeEmission::remember($orderID, $token, $response->uuid); }
+
 
     $alerts = array();
     if (!$response || isset($response->error) || $response->status == 'reprovado' ){
 
+      // SEFAZ rejection text is API data: only a scalar from the documented array shape, escaped like ->error.
+      $motivo = '';
+      if ($response && !isset($response->error) && isset($response->log) && is_object($response->log) &&
+          isset($response->log->aProt) && is_array($response->log->aProt) && isset($response->log->aProt[0]) &&
+          is_object($response->log->aProt[0]) && isset($response->log->aProt[0]->xMotivo) && is_scalar($response->log->aProt[0]->xMotivo)) {
+        $motivo = htmlspecialchars((string) $response->log->aProt[0]->xMotivo, ENT_QUOTES, 'UTF-8');
+      }
+
       if (!$response){
         $alerts[] = array('type' => 'error', 'msg' => 'Erro ao emitir a NF-e do Pedido #'.$orderID.' (null)');
-        $this->context->controller->errors[] = 'Erro ao emitir a NF-e do Pedido #'.$orderID.' (null)';
+        $this->controllerMessage('errors', 'Erro ao emitir a NF-e do Pedido #'.$orderID.' (null)');
         echo 'Erro ao emitir a NF-e do Pedido #'.$orderID.' (null)';
       } elseif (isset($response->error)){
         $alerts[] = array('type' => 'error', 'msg' => 'Erro ao emitir a NF-e do Pedido #'.$orderID.' ( '.$response->error.' )');
-        $this->context->controller->errors[] = 'Erro ao emitir a NF-e do Pedido #'.$orderID.' ( '.$response->error.' )';
-      } elseif (isset($response->log->aProt[0]->xMotivo)){
-        $alerts[] = array('type' => 'error', 'msg' => 'Erro ao emitir a NF-e do Pedido #'.$orderID. '( '.$response->log->aProt[0]->xMotivo.' )');
-        $this->context->controller->errors[] = 'Erro ao emitir a NF-e do Pedido #'.$orderID. '( '.$response->log->aProt[0]->xMotivo.' )';
+        $this->controllerMessage('errors', 'Erro ao emitir a NF-e do Pedido #'.$orderID.' ( '.$response->error.' )');
+      } elseif ($motivo !== ''){
+        $alerts[] = array('type' => 'error', 'msg' => 'Erro ao emitir a NF-e do Pedido #'.$orderID. '( '.$motivo.' )');
+        $this->controllerMessage('errors', 'Erro ao emitir a NF-e do Pedido #'.$orderID. '( '.$motivo.' )');
       } else {
         $alerts[] = array('type' => 'error', 'msg' => 'Erro ao emitir a NF-e do Pedido #'.$orderID);
-        $this->context->controller->errors[] = 'Erro ao emitir a NF-e do Pedido #'.$orderID;
+        $this->controllerMessage('errors', 'Erro ao emitir a NF-e do Pedido #'.$orderID);
       }
 
 
     }else{
 
-      $nfe_info = array(
-      'uuid'         => (string) $response->uuid,
-      'status'       => (string) $response->status,
-      'chave_acesso' => $response->chave,
-      'n_recibo'     => (int) $response->recibo,
-      'n_nfe'        => (int) $response->nfe,
-      'n_serie'      => (int) $response->serie,
-      'url_xml'      => (string) $response->xml,
-      'url_danfe'    => (string) $response->danfe,
-      'url_danfe_simplificada'    => (string) $response->danfe_simples,
-      'url_danfe_etiqueta'    => (string) $response->danfe_etiqueta,
-      'documento'    => (string) ($data['cliente']['cnpj'] ?? $data['cliente']['cpf'] ?? '' ),
-      'data'         => date('d/m/Y'),
-      );
-
-      $existing_nfe_info = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $orderID" ));
-      if(!$existing_nfe_info){
-        $existing_nfe_info = array();
+      $document = isset($data['cliente']['cnpj']) ? $data['cliente']['cnpj'] : (isset($data['cliente']['cpf']) ? $data['cliente']['cpf'] : '');
+      if (!$this->persistNfeResponse($orderID, $response, $document, true, true)) {
+        $alerts[] = array('type' => 'error', 'msg' => 'A nota foi recebida, mas não foi possível salvar sua confirmação. Consulte a Webmania antes de repetir.');
+        return $alerts;
       }
-
-      $existing_nfe_info[] = $nfe_info;
-
-      $nfe_info_str = serialize($existing_nfe_info);
-
-      if(!Db::getInstance()->update('orders', array('nfe_info' => $nfe_info_str), 'id_order = ' .$orderID )){
-        $alerts[] = array('type' => 'error', 'msg' => 'Erro ao atualizar status da NF-e');
-        $this->context->controller->errors[] = 'Erro ao atualizar status da NF-e';
-      }
-
-      if(!Db::getInstance()->update('orders', array('nfe_numero' => $response->nfe), 'id_order = ' .$orderID )){
-        $alerts[] = array('type' => 'error', 'msg' => 'Erro ao atualizar status da NF-e');
-        $this->context->controller->errors[] = 'Erro ao atualizar status da NF-e';
-      }
-
-      if(!Db::getInstance()->update('orders', array('nfe_chave_de_acesso' => $response->chave), 'id_order = ' .$orderID )){
-        $alerts[] = array('type' => 'error', 'msg' => 'Erro ao atualizar status da NF-e');
-        $this->context->controller->errors[] = 'Erro ao atualizar status da NF-e';
-      }
-
-      if(!Db::getInstance()->update('orders', array('nfe_issued' => 1), 'id_order = ' .$orderID )){
-        $alerts[] = array('type' => 'error', 'msg' => 'Erro ao alterar status da NF-e #'.$orderID);
-        $this->context->controller->errors[] = 'Erro ao alterar status da NF-e #'.$orderID;
-      }
+      $this->emissionRelease[$orderID] = true;
 
         $alerts[] = array('type' => 'success', 'msg' => 'NF-e emitida com sucesso do Pedido #'.$orderID);
-        $this->context->controller->confirmations[] = 'NF-e emitida com sucesso do Pedido #'.$orderID;
+        $this->controllerMessage('confirmations', 'NF-e emitida com sucesso do Pedido #'.$orderID);
 
     }
 
@@ -2785,8 +2491,8 @@ class WebmaniaBrNFe extends Module{
 
   public function updateNFe(){
 
-    if(Tools::getValue('atualizar') && Tools::getValue('chave')){
-      $chave_acesso = pSql(Tools::getValue('chave'));
+    if(Tools::getValue('atualizar') && Tools::getValue('chave') && is_scalar(Tools::getValue('chave'))){
+      $chave_acesso = pSql((string) Tools::getValue('chave'));
       $order_id = (int) Tools::getValue('id_order');
       $webmaniabr = new NFe($this->settings);
       $response = $webmaniabr->consultaNotaFiscal($chave_acesso);
@@ -2799,7 +2505,7 @@ class WebmaniaBrNFe extends Module{
       }else{
 
         $new_status = $response->status;
-        $nfe_data = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $order_id" ));
+        $nfe_data = WebmaniaNFeSecurity::invoices(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $order_id" ));
 
         foreach($nfe_data as &$order_nfe){
           if($order_nfe['chave_acesso'] == $chave_acesso){
@@ -2809,7 +2515,7 @@ class WebmaniaBrNFe extends Module{
 
         $nfe_data_str = serialize($nfe_data);
 
-        if(!Db::getInstance()->update('orders', array('nfe_info' => $nfe_data_str),"id_order = '" .$order_id."'  " )){
+        if(!Db::getInstance()->update('orders', array('nfe_info' => pSQL($nfe_data_str)),"id_order = '" .$order_id."'  " )){
           $this->context->controller->errors[] = 'Erro ao atualizar informações da Nota Fiscal';
         }else{
           $this->context->controller->confirmations[] = 'NF-e atualizada com sucesso';
@@ -2821,15 +2527,34 @@ class WebmaniaBrNFe extends Module{
 
   public function processBulkEmitirNfe(){
 
-    if( Tools::isSubmit('submitBulkemitirNfeorder')  ){
-      $values = Tools::getValue('orderBox');
-      foreach($values as $orderID){
+    $bulk_actions = array('submitBulkemitirNfeorder', 'submitBulkimprimirDanfe', 'submitBulkimprimirDanfeSimples', 'submitBulkimprimirDanfeEtiqueta');
+    $submitted = false;
+    foreach ($bulk_actions as $bulk_action) { if (Tools::isSubmit($bulk_action)) { $submitted = true; } }
+    if (!$submitted) { return; }
+
+    // This runs from the back-office header of every page: accept only the AdminOrders list form
+    // (whose token PrestaShop validates) and the order permissions the native routes require.
+    $controller = isset($this->context->controller) ? $this->context->controller : null;
+    if (!isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'POST' || !is_object($controller) ||
+        !isset($controller->controller_name) || $controller->controller_name !== 'AdminOrders') { return; }
+
+    $order_box = array();
+    $submitted_ids = Tools::getValue('orderBox');
+    foreach (is_array($submitted_ids) ? $submitted_ids : array() as $id) {
+      if (is_scalar($id) && ctype_digit((string) $id) && (int) $id > 0) { $order_box[] = (int) $id; }
+    }
+    if (!$order_box) { return; }
+
+    if( Tools::isSubmit('submitBulkemitirNfeorder') && $this->employeeCan('AdminOrders', 'edit') ){
+      foreach($order_box as $orderID){
         $this->emitirNfe($orderID);
       }
     }
 
+    if (!$this->employeeCan('AdminOrders', 'view')) { return; }
+
     if( Tools::isSubmit('submitBulkimprimirDanfe')  ){
-      $values = Tools::getValue('orderBox');
+      $values = $order_box;
       if (!empty($values)) {
         $result = $this->get_nfe_urls($values, 'normal');
         if ($result['result'] && !empty($result['file']) && file_exists($result['file'])) {
@@ -2839,7 +2564,7 @@ class WebmaniaBrNFe extends Module{
     }
 
     if( Tools::isSubmit('submitBulkimprimirDanfeSimples')  ){
-      $values = Tools::getValue('orderBox');
+      $values = $order_box;
       if (!empty($values)) {
         $result = $this->get_nfe_urls($values, 'simples');
         if ($result['result'] && !empty($result['file']) && file_exists($result['file'])) {
@@ -2849,7 +2574,7 @@ class WebmaniaBrNFe extends Module{
     }
 
     if( Tools::isSubmit('submitBulkimprimirDanfeEtiqueta')  ){
-      $values = Tools::getValue('orderBox');
+      $values = $order_box;
       if (!empty($values)) {
         $result = $this->get_nfe_urls($values, 'etiqueta');
         if ($result['result'] && !empty($result['file']) && file_exists($result['file'])) {
@@ -3071,8 +2796,12 @@ class WebmaniaBrNFe extends Module{
   }
 
   function is_cpf($cpf = null){
+        if (is_array($cpf)) { $cpf = isset($cpf[0]) && is_scalar($cpf[0]) ? $cpf[0] : ''; }
+        if (!is_scalar($cpf)) { return false; }
+        $cpf = (string) $cpf;
 
-      if(is_array($cpf)) $cpf = $cpf[0];
+
+      
       $cpf = preg_replace( '/[^0-9]/', '', $cpf );
 
       if ( 11 != strlen( $cpf ) || preg_match( '/^([0-9])\1+$/', $cpf ) ) {
@@ -3097,66 +2826,9 @@ class WebmaniaBrNFe extends Module{
   }
 
   function is_cnpj($cnpj = null) {
-
-    // Verifica se um número foi informado
-	if(empty($cnpj)) {
-		return false;
-	}
-
-	// Elimina possivel mascara
-	$cnpj = preg_replace("/[^0-9]/", "", $cnpj);
-
-	// Verifica se o numero de digitos informados é igual a 11
-	if (strlen($cnpj) != 14) {
-		return false;
-	}
-
-	// Verifica se nenhuma das sequências invalidas abaixo
-	// foi digitada. Caso afirmativo, retorna falso
-	else if ($cnpj == '00000000000000' ||
-		$cnpj == '11111111111111' ||
-		$cnpj == '22222222222222' ||
-		$cnpj == '33333333333333' ||
-		$cnpj == '44444444444444' ||
-		$cnpj == '55555555555555' ||
-		$cnpj == '66666666666666' ||
-		$cnpj == '77777777777777' ||
-		$cnpj == '88888888888888' ||
-		$cnpj == '99999999999999') {
-		return false;
-
-	 // Calcula os digitos verificadores para verificar se o
-	 // CPF é válido
-    } else {
-
-		$j = 5;
-		$k = 6;
-		$soma1 = 0;
-		$soma2 = 0;
-
-		for ($i = 0; $i < 13; $i++) {
-
-			$j = $j == 1 ? 9 : $j;
-			$k = $k == 1 ? 9 : $k;
-
-			$soma2 += ($cnpj[$i] * $k);
-
-			if ($i < 12) {
-				$soma1 += ($cnpj[$i] * $j);
-			}
-
-			$k--;
-			$j--;
-
-		}
-
-		$digito1 = $soma1 % 11 < 2 ? 0 : 11 - $soma1 % 11;
-		$digito2 = $soma2 % 11 < 2 ? 0 : 11 - $soma2 % 11;
-
-		return (($cnpj[12] == $digito1) and ($cnpj[13] == $digito2));
-
+        if (is_array($cnpj)) { $cnpj = isset($cnpj[0]) && is_scalar($cnpj[0]) ? $cnpj[0] : ''; }
+        return WebmaniaNFeSecurity::validCnpj($cnpj);
     }
-  }
 
   function cpf( $string ){
 
@@ -3169,16 +2841,14 @@ class WebmaniaBrNFe extends Module{
   }
 
   function cnpj( $string ){
-
-    if (!$string) return;
-    $string = $this->clear( $string );
-    $string = $this->mask($string,'##.###.###/####-##');
-
-    return $string;
-
-  }
+        $string = WebmaniaNFeSecurity::normalizeDocument($string);
+        if (!preg_match('/\A[A-Z0-9]{12}[0-9]{2}\z/', $string)) { return; }
+        return $this->mask($string, '##.###.###/####-##');
+    }
 
   function clear( $string ) {
+        $string = is_scalar($string) ? (string) $string : '';
+
 
         $string = str_replace( array(',', '-', '!', '.', '/', '?', '(', ')', ' ', '$', 'R$', '€'), '', $string );
         return $string;
@@ -3186,6 +2856,8 @@ class WebmaniaBrNFe extends Module{
 	}
 
 	function mask($val, $mask) {
+        $val = is_scalar($val) ? (string) $val : '';
+
 	   $maskared = '';
 	   $k = 0;
 	   for($i = 0; $i<=strlen($mask)-1; $i++){
@@ -3549,98 +3221,84 @@ class WebmaniaBrNFe extends Module{
   }
 
   function listen_notification() {
-
-    if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['retorno_nfe']) && $_GET['order_id']){
-
-      $order_id = (int) $_GET['order_id'];
-      $uniq_key = Configuration::get($this->name.'uniq_key');
-
-      if($_GET['retorno_nfe'] == $uniq_key){
-
-        $order_nfe_info = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $order_id" ));
-
-        if(!$order_nfe_info) $order_nfe_info = array();
-
-        foreach($order_nfe_info as $key => $nfe){
-
-          $uuid       = $nfe['uuid'];
-
-          $current_status = $nfe['status'];
-          $received_status = $_POST['status'];
-
-
-          if($uuid == $_POST['uuid'] && $current_status != $received_status){
-
-            $order_nfe_info[$key]['status'] = $received_status;
-            $nfe_info_str = serialize($order_nfe_info);
-
-            if(!Db::getInstance()->update('orders', array('nfe_info' => $nfe_info_str), 'id_order = ' .$order_id )){
-              $this->context->controller->errors[] = 'Erro ao atualizar status da NF-e';
-            }
-            break;
-          }
-
-
-        }
-
-      }
-
+    if (!isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'POST' ||
+        !isset($_GET['retorno_nfe'], $_GET['order_id'], $_POST['uuid']) ||
+        !is_scalar($_GET['order_id']) || !ctype_digit((string) $_GET['order_id']) || (int) $_GET['order_id'] < 1 ||
+        !WebmaniaNFeSecurity::validUuid($_POST['uuid']) ||
+        !WebmaniaNFeSecurity::equals(Configuration::get($this->name.'uniq_key'), $_GET['retorno_nfe'])) { return; }
+    $order_id = (int) $_GET['order_id'];
+    $uuid = $_POST['uuid'];
+    $invoices = WebmaniaNFeSecurity::invoices(Db::getInstance()->getValue('SELECT nfe_info FROM '._DB_PREFIX_.'orders WHERE id_order = '.$order_id, false));
+    $known = false;
+    foreach ($invoices as $invoice) { if (isset($invoice['uuid']) && $invoice['uuid'] === $uuid) { $known = true; break; } }
+    $token = isset($_GET['wmbr_emission_token']) ? $_GET['wmbr_emission_token'] : '';
+    $reservation = WebmaniaNFeEmission::find($order_id, $token);
+    if ($reservation && $reservation['phase'] !== 'dispatching') { $reservation = false; }
+    if (!$known && !$reservation) { return; }
+    if ($reservation && $reservation['uuid'] !== '' && $reservation['uuid'] !== $uuid) { return; }
+    $api = new NFe($this->settings);
+    $response = $api->consultaNotaFiscal($uuid);
+    if (isset($response->error) || !isset($response->uuid) || $response->uuid !== $uuid) { return; }
+    $response_id = isset($response->ID) ? $response->ID : (isset($response->data->ID) ? $response->data->ID : null);
+    if ($response_id !== null && (!is_scalar($response_id) || (string) $response_id !== (string) $order_id)) { return; }
+    // A saved emission UUID also proves ownership when the consultation omits ID.
+    $allowInsert = $reservation && (
+      ((is_string($response_id) || is_int($response_id)) && (string) $response_id === (string) $order_id) ||
+      ($response_id === null && $reservation['uuid'] !== '' && $reservation['uuid'] === $uuid)
+    );
+    if (!$known && !$allowInsert) { return; }
+    // A rejected attempt is not an issued invoice. Keep updates to existing history compatible.
+    if (!$known && isset($response->status) && $response->status === 'reprovado') {
+      WebmaniaNFeEmission::release($order_id, $token);
+      return;
     }
-
+    $document = '';
+    if ($allowInsert) {
+      $client = isset($response->data->cliente) && is_object($response->data->cliente) ? $response->data->cliente : null;
+      if ($client && isset($client->cnpj) && is_scalar($client->cnpj)) { $document = (string) $client->cnpj; }
+      elseif ($client && isset($client->cpf) && is_scalar($client->cpf)) { $document = (string) $client->cpf; }
+      else {
+        $document = Db::getInstance()->getValue('SELECT c.nfe_document_number FROM '._DB_PREFIX_.'customer c INNER JOIN '._DB_PREFIX_.
+          'orders o ON o.id_customer = c.id_customer WHERE o.id_order = '.$order_id, false);
+      }
+    }
+    if ($this->persistNfeResponse($order_id, $response, is_scalar($document) ? (string) $document : '', $allowInsert, false,
+        $reservation ? $reservation['requested_at'] : null) && $reservation) {
+      WebmaniaNFeEmission::release($order_id, $token);
+    }
   }
 
   function get_nfe_urls($ids, $type) {
-
-    $webmaniabr = new NFe($this->settings);
-    $directory = _PS_ROOT_DIR_.'/modules/webmaniabrnfe/pdf_files/';
-    if (!file_exists($directory)) {
-      mkdir($directory);
-    } 
-
-    $link_pdf = '';
-
+    $failure = array('result' => false, 'file' => '', 'filename' => '');
+    if (!is_array($ids) || !in_array($type, array('normal', 'simples', 'etiqueta'), true)) { return $failure; }
+    $api = new NFe($this->settings);
+    $directory = WebmaniaNFeSecurity::privateDirectory();
     $pdf = new PDFMerger();
-
-    $files = 0;
-    $paths_file_key = [];
+    $sources = array();
     foreach ($ids as $id) {
-      $nfe_info = unserialize(Db::getInstance()->getValue("SELECT nfe_info FROM "._DB_PREFIX_."orders WHERE id_order = $id" ));
-
-      if (!$nfe_info) {
-        continue;
-      }
-
-      $data = end($nfe_info);
-      if ($data['status'] != 'aprovado') {
-        continue;
-      }
-
-      if ($type == 'normal') {
+        if (!is_scalar($id) || !ctype_digit((string) $id)) { continue; }
+        $invoices = WebmaniaNFeSecurity::invoices(Db::getInstance()->getValue('SELECT nfe_info FROM '._DB_PREFIX_.'orders WHERE id_order = '.(int) $id));
+        $data = $invoices ? end($invoices) : array();
+        if (!is_array($data) || !isset($data['status'], $data['url_danfe']) || $data['status'] !== 'aprovado') { continue; }
         $url = $data['url_danfe'];
-      }
-      else if ($type == 'simples') {
-        $url = ($data['url_danfe_simplificada']) ? $data['url_danfe_simplificada'] : str_replace('/danfe/', '/danfe/simples/', $data['url_danfe']);
-      }
-      else if ($type == 'etiqueta') {
-        $url = ($data['url_danfe_etiqueta']) ? $data['url_danfe_etiqueta'] : str_replace('/danfe/', '/danfe/etiqueta/', $data['url_danfe']);
-      }
-      $path_file_key = "{$directory}/{$data['chave_acesso']}.pdf";
-      file_put_contents($path_file_key, $webmaniabr->curl_get_file_contents($url));
-			$pdf->addPDF($path_file_key, 'all');
-      $paths_file_key[] = $path_file_key;
-      $files++;
+        if ($type === 'simples') { $url = !empty($data['url_danfe_simplificada']) ? $data['url_danfe_simplificada'] : str_replace('/danfe/', '/danfe/simples/', $url); }
+        if ($type === 'etiqueta') { $url = !empty($data['url_danfe_etiqueta']) ? $data['url_danfe_etiqueta'] : str_replace('/danfe/', '/danfe/etiqueta/', $url); }
+        $content = $api->curl_get_file_contents($url);
+        if ($content === false) { continue; }
+        $source = $directory . WebmaniaNFeSecurity::randomToken() . '.pdf';
+        if (file_put_contents($source, $content) !== false) { $sources[] = $source; $pdf->addPDF($source, 'all'); }
     }
+    $filename = WebmaniaNFeSecurity::randomToken() . '.pdf';
+    $path = $directory . $filename;
+    $result = false;
+    try { if ($sources) { $result = $pdf->merge('file', $path); } }
+    catch (Exception $e) { $result = false; }
+    catch (Throwable $e) { $result = false; }
+    foreach ($sources as $source) { if (is_file($source)) { unlink($source); } }
+    if (!$result) { if (is_file($path)) { unlink($path); } rmdir($directory); return $failure; }
+    return array('result' => $result, 'file' => $path, 'filename' => $filename);
 
-    $filename = time()."-".random_int(1, 10000000000) . ".pdf";
-		$result = ($files > 0) ? $pdf->merge('file', $directory . $filename) : false;
-
-    foreach($paths_file_key as $path_file_key){
-      if(file_exists($path_file_key)) unlink($path_file_key);
-    }
-
-		return array("result" => $result, "file" => $directory . $filename, "filename" => $filename);
-    
-  }
+}
 
   public function showDanfe($file, $filename, $download = false){
 
@@ -3651,7 +3309,7 @@ class WebmaniaBrNFe extends Module{
     header('Pragma: no-cache');
     header('Expires: 0');
 
-    ob_clean();
+    if (ob_get_level()) { ob_clean(); }
     flush();
     $handle = fopen($file, "rb");
     while (!feof($handle)) {
@@ -3661,6 +3319,7 @@ class WebmaniaBrNFe extends Module{
     fclose($handle);
 
     unlink($file);
+    rmdir(dirname($file));
     die();
 
   }
@@ -3678,33 +3337,34 @@ class WebmaniaBrNFe extends Module{
 
   public function getCustomerDocs($customer, $order){
 
-    $customer_docs = array();
+    $customer_docs = array('cpf' => '', 'cnpj' => '', 'razao_social' => '', 'ie' => '');
     // Get Custom Fields
     $cpf_cnpj_status = Configuration::get($this->name.'cpf_cnpj_status');
 
     if ($cpf_cnpj_status == 'on'){
 
       $result = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
-
-      $customer_docs = array(
-        'cpf'          => $result['nfe_document_number'],
-        'cnpj'         => $result['nfe_document_number'],
-        'razao_social' => $result['nfe_razao_social'],
-        'ie'           => $result['nfe_pj_ie']
-      );
+      if (is_array($result)) {
+        $customer_docs = array(
+          'cpf'          => $result['nfe_document_number'],
+          'cnpj'         => $result['nfe_document_number'],
+          'razao_social' => $result['nfe_razao_social'],
+          'ie'           => $result['nfe_pj_ie']
+        );
+      }
 
     } else {
 
-      $customer_docs = array();
+      $customer_docs = array('cpf' => '', 'cnpj' => '', 'razao_social' => '', 'ie' => '');
 
       if(!Configuration::get($this->name.'docscolumn_cpf')){
 
-        $fields = array(
+        $fields = array_map('strval', array(
           'cpf'            => Configuration::get($this->name.'cpf_field'),
           'cnpj'           => Configuration::get($this->name.'cnpj_field'),
           'razao_social'   => Configuration::get($this->name.'razao_social_field'),
           'ie'             => Configuration::get($this->name.'cnpj_ie_field')
-        );
+        ));
 
         $address = new Address($order->id_address_delivery);
         $customer_custom = Db::getInstance()->getRow('SELECT * FROM '._DB_PREFIX_.'customer WHERE id_customer = ' . (int)$customer->id);
@@ -3747,13 +3407,15 @@ class WebmaniaBrNFe extends Module{
                 $table  = $doc['table'];
                 $column = $doc['column'];
 
-                if ($table != "" && $column != "" && $customer->id != ""){
+                // Mapping values are saved through the settings form (isGenericName accepts quotes and
+                // spaces): only plain identifiers are interpolated, so the setting cannot carry SQL.
+                if ($this->isSqlIdentifier($table) && $this->isSqlIdentifier($column) && (int) $customer->id > 0){
 
-                    $query = "SELECT $column FROM $table WHERE id_customer = '$customer->id'";
+                    $query = 'SELECT `'.$column.'` FROM `'.$table.'` WHERE id_customer = '.(int) $customer->id;
                     $val = Db::getInstance()->executeS($query);
 
-                    foreach ($val as $value) {
-                        $customer_docs[$key] = $value[$column];
+                    foreach (is_array($val) ? $val : array() as $value) {
+                        if (array_key_exists($column, $value)) { $customer_docs[$key] = $value[$column]; }
                     }
 
                 }
