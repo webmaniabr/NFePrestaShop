@@ -1,4 +1,7 @@
 <?php
+if (!defined('_PS_VERSION_')) {
+    exit;
+}
 /**
  * Description of view
  *
@@ -13,22 +16,24 @@ class WebmaniaBRNFeView16ModuleFrontController extends ModuleFrontControllerCore
 
         parent::initContent();
         if (!$this->context->customer->isLogged(true)){
-            $redirect_url = $this->context->link->getModuleLink('webmaniabrnfe','view');
+            $redirect_url = $this->context->link->getModuleLink('webmaniabrnfe','view16');
             $params = array('back' => $redirect_url);
             Tools::redirect($this->context->link->getPageLink('authentication', true, (int)$this->context->language->id, $params));
         }
 
 
         $id_customer = $this->context->customer->id;
+        $this->context->smarty->assign('wmbr_token', Tools::getToken(false));
         $result = Db::getInstance()->getRow('SELECT nfe_document_type, nfe_document_number, nfe_razao_social, nfe_pj_ie FROM '. _DB_PREFIX_ .'customer WHERE id_customer='.(int)$id_customer);
 
 
         if($result){
+          // The template escapes these values: NULL columns become empty strings.
           $this->context->smarty->assign(array(
-              'document_number' => $result['nfe_document_number'],
-              'document_type' => $result['nfe_document_type'],
-              'razao_social' => $result['nfe_razao_social'],
-              'pj_ie' => $result['nfe_pj_ie'],
+              'document_number' => (string) $result['nfe_document_number'],
+              'document_type' => (string) $result['nfe_document_type'],
+              'razao_social' => (string) $result['nfe_razao_social'],
+              'pj_ie' => (string) $result['nfe_pj_ie'],
           ));
         }else{
           $this->context->smarty->assign(array(
@@ -49,13 +54,25 @@ class WebmaniaBRNFeView16ModuleFrontController extends ModuleFrontControllerCore
   public function postProcess(){
     $confirmations = array();
     if(Tools::getValue('document_types')){
-      $document_type = Tools::getValue('document_type');
+      // Fiscal identification changes: logged-in customer, POST and the customer's static token
+      // (same token as the address AJAX). postProcess() runs before initContent()'s login check.
+      if (!$this->context->customer->isLogged(true) || !isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'POST' ||
+          !WebmaniaNFeSecurity::equals(Tools::getToken(false), Tools::getValue('token'))) {
+        $this->errors[] = 'Não foi possível validar a solicitação. Recarregue a página e tente novamente.';
+        return false;
+      }
+      $submitted = array();
+      foreach (array('document_type', 'cpf', 'cnpj', 'razao_social', 'cnpj_ie') as $field) {
+        $value = Tools::getValue($field);
+        $submitted[$field] = is_scalar($value) ? trim((string) $value) : '';
+      }
+      $document_type = $submitted['document_type'];
       $valid = true;
       if($document_type != 'cpf' && $document_type != 'cnpj'){
         $this->errors[] = Tools::displayError('Escolha o tipo de pessoa adequado');
         $valid = false;
       }elseif($document_type == 'cpf'){
-        $document_number = Tools::getValue('cpf');
+        $document_number = $submitted['cpf'];
         $validate = $this->module->is_cpf($document_number);
 
         if($validate === false){
@@ -63,10 +80,10 @@ class WebmaniaBRNFeView16ModuleFrontController extends ModuleFrontControllerCore
           $valid = false;
         }
       }elseif($document_type == 'cnpj'){
-        $document_number = Tools::getValue('cnpj');
+        $document_number = $submitted['cnpj'];
         $validate = $this->module->is_cnpj($document_number);
-        $razao_social = Tools::getValue('razao_social');
-        $inscricao_estadual = Tools::getValue('cnpj_ie');
+        $razao_social = $submitted['razao_social'];
+        $inscricao_estadual = $submitted['cnpj_ie'];
         if($validate === false){
           $this->errors[] = Tools::displayError('Insira um CNPJ válido');
           $valid = false;
@@ -86,26 +103,27 @@ class WebmaniaBRNFeView16ModuleFrontController extends ModuleFrontControllerCore
       if($valid === true){
         $customer_id = (int)$this->context->customer->id;
         $DB_data = array();
-        $document_type = Tools::getValue('document_type');
 
         if($document_type == 'cpf'){
           $DB_data = array(
-            'nfe_document_type'   => pSQL(Tools::getValue('document_type')),
-            'nfe_document_number' => pSQL(preg_replace("/[^0-9]/","", Tools::getValue('cpf'))),
+            'nfe_document_type'   => 'cpf',
+            'nfe_document_number' => pSQL(preg_replace("/[^0-9]/","", $submitted['cpf'])),
           );
         }elseif($document_type == 'cnpj'){
           $DB_data = array(
-            'nfe_document_type'   => pSQL(Tools::getValue('document_type')),
-            'nfe_document_number' => pSQL(preg_replace("/[^0-9]/","", Tools::getValue('cnpj'))),
-            'nfe_razao_social'    => pSQL(Tools::getValue('razao_social')),
-            'nfe_pj_ie'           => pSQL(Tools::getValue('cnpj_ie')),
+            'nfe_document_type'   => 'cnpj',
+            'nfe_document_number' => pSQL(WebmaniaNFeSecurity::normalizeDocument($submitted['cnpj'])),
+            'nfe_razao_social'    => pSQL($submitted['razao_social']),
+            'nfe_pj_ie'           => pSQL($submitted['cnpj_ie']),
           );
         }
 
         if(!Db::getInstance()->update('customer', $DB_data, 'id_customer = ' .$customer_id )){
-          $this->errors[] = Tools::displayError('Erro: ').mysql_error();
+          // mysql_error() does not exist on PHP 7+; never show database details to customers.
+          $this->errors[] = Tools::displayError('Não foi possível atualizar as informações.');
         }else{
-          $this->confirmations[] = Tools::displayError('Informações atualizadas com sucesso');
+          // Local list: FrontController has no $confirmations property (PHP 8.2 dynamic property).
+          $confirmations[] = Tools::displayError('Informações atualizadas com sucesso');
           $this->context->smarty->assign(array('confirmations' => $confirmations));
         }
         return true;

@@ -20,7 +20,7 @@ jQuery(document).ready(function(){
 
     $.ajax({
       method: 'POST',
-      url:  '../modules/webmaniabrnfe/ajax.php',
+      url:  wmbr_admin_ajax_url,
       data:{
         method: 'getCategoryNcm',
         id_category : category_id,
@@ -28,7 +28,7 @@ jQuery(document).ready(function(){
       }
     }).done(function(response){
       
-      var result = $.parseJSON(response);
+      var result = (typeof response === 'string' ? $.parseJSON(response) : response);
 
       if(result.result == 'success'){
         $cat_ncm.find('input[name="nfe_category_ncm_1"]').val(result.ncm);

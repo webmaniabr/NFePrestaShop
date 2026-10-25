@@ -4,37 +4,38 @@
     <div class="form-group" style="margin-bottom:10px">
       <label class="control-label col-lg-3" style="text-align:left;max-width:160px;">Ignorar pedido ao Emtir NFe</label>
       <div class="col-lg-9" style="margin-bottom:20px">
+        <input type="hidden" name="nfe_ignorar_nfe" value="0"/>
         <input type="checkbox" name="nfe_ignorar_nfe" value="1" {if $ignorar_nfe == 1} checked {/if} style="margin-top:5px"/>
       </div>
     </div>
     <div class="form-group" style="margin-bottom:10px">
       <label class="control-label col-lg-3" style="text-align:left;max-width:160px;">Classe de Imposto</label>
       <div class="col-lg-9">
-        <input type="text" name="nfe_tax_class" value="{$tax_class}"/>
+        <input type="text" name="nfe_tax_class" value="{$tax_class|escape:'html':'UTF-8'}"/>
       </div>
     </div>
     <div class="form-group" style="margin-bottom:10px">
       <label class="control-label col-lg-3" style="text-align:left;max-width:160px;">Código de Barras EAN</label>
       <div class="col-lg-9">
-        <input type="text" name="nfe_ean_bar_code" value="{$ean_bar_code}"/>
+        <input type="text" name="nfe_ean_bar_code" value="{$ean_bar_code|escape:'html':'UTF-8'}"/>
       </div>
     </div>
     <div class="form-group" style="margin-bottom:10px">
       <label class="control-label col-lg-3" style="text-align:left;max-width:160px;">Código NCM</label>
       <div class="col-lg-9">
-        <input type="text" name="nfe_ncm_code" value="{$ncm_code}"/>
+        <input type="text" name="nfe_ncm_code" value="{$ncm_code|escape:'html':'UTF-8'}"/>
       </div>
     </div>
     <div class="form-group" style="margin-bottom:10px">
       <label class="control-label col-lg-3" style="text-align:left;max-width:160px;">Código CEST</label>
       <div class="col-lg-9">
-        <input type="text" name="nfe_cest_code" value="{$cest_code}"/>
+        <input type="text" name="nfe_cest_code" value="{$cest_code|escape:'html':'UTF-8'}"/>
       </div>
     </div>
     <div class="form-group" style="margin-bottom:10px">
       <label class="control-label col-lg-3" style="text-align:left;max-width:160px;">Origem</label>
       <div class="col-lg-9">
-        <select class="fixed-width-xl" name="nfe_product_source" value="{$product_source}">
+        <select class="fixed-width-xl" name="nfe_product_source" value="{$product_source|escape:'html':'UTF-8'}">
           {assign var=options value=[
               '-1' => 'Selecionar Origem do Produto',
               '0' => '0 - Nacional, exceto as indicadas nos códigos 3, 4, 5, e 8',

@@ -169,7 +169,7 @@ jQuery(document).ready(function(){
         var id_customer = id_customer_wmbr;
         $.ajax({
           type: 'POST',
-          url: '../modules/webmaniabrnfe/ajax.php',
+          url: wmbr_admin_ajax_url,
           data: {
             method: 'checkForDoc',
             adminToken: sec_token,
@@ -177,7 +177,7 @@ jQuery(document).ready(function(){
           },
           success: function(json) {
             console.log(json);
-            result = $.parseJSON(json);
+            result = (typeof json === 'string' ? $.parseJSON(json) : json);
 
             if(typeof result.document_type != 'undefined'){
               $('input[value="'+result.document_type+'"]').prop('checked', true).trigger('change');
@@ -196,14 +196,14 @@ jQuery(document).ready(function(){
         $.ajax({
 
           type: 'POST',
-          url: '../modules/webmaniabrnfe/ajax.php',
+          url: wmbr_admin_ajax_url,
           data: {
             method: 'getAddressInfo',
             addressID: address_id,
             adminToken: sec_token,
           },
           success: function(json) {
-            result = $.parseJSON(json);
+            result = (typeof json === 'string' ? $.parseJSON(json) : json);
             if(typeof result.address_number != 'undefined'){
               $('input[name="address_number"]').val(result.address_number);
             }
@@ -280,7 +280,7 @@ jQuery(document).ready(function(){
         }
 
         $('#cpf').mask('999.999.999-99');
-        $('#cnpj').mask('99.999.999/9999-99');
+        $('#cnpj').mask('AA.AAA.AAA/AAAA-00');
 
       }
     },
@@ -420,7 +420,7 @@ jQuery(document).ready(function(){
       handleBairroStatus(bairro_status);
     });
 
-    $('input[name="webmaniabrnfeintermediador_cnpj').mask("99.999.999/9999-99");
+    $('input[name="webmaniabrnfeintermediador_cnpj"]').mask("AA.AAA.AAA/AAAA-00");
 
     update_payment_desc_label = function() {
       
@@ -479,7 +479,7 @@ jQuery(document).ready(function(){
     $.ajax({
 
       type: 'POST',
-      url: '../modules/webmaniabrnfe/ajax.php',
+      url: wmbr_admin_ajax_url,
       data: {
         method: 'getPSColumns',
         table_name: table_name,
@@ -487,7 +487,7 @@ jQuery(document).ready(function(){
       },
       success: function(json) {
         
-        var result = $.parseJSON(json);
+        var result = (typeof json === 'string' ? $.parseJSON(json) : json);
         $column_select.html('<option value="">Selecionar</option>');
       
         result.results.forEach(function(value, index){

@@ -18,20 +18,20 @@
       </thead>
       <tbody>
         {foreach $nfe_info_arr as $order_nfe}
-        <tr><td class="column-columnname">{$order_nfe['data']}</td>
-          <td class="column-columnname">{$order_nfe['n_serie']}</td>
-          <td class="column-columnname">{$order_nfe['n_nfe']}</td>
-          <td class="column-columnname">{$order_nfe['n_recibo']}</td>
-          <td class="column-columnname">{$order_nfe['chave_acesso']}</td>
-          <td class="column-columnname"><a target="_blank" href="{$order_nfe['url_xml']}">Download XML</a></td>
+        <tr><td class="column-columnname">{$order_nfe['data']|escape:'html':'UTF-8'}</td>
+          <td class="column-columnname">{$order_nfe['n_serie']|escape:'html':'UTF-8'}</td>
+          <td class="column-columnname">{$order_nfe['n_nfe']|escape:'html':'UTF-8'}</td>
+          <td class="column-columnname">{$order_nfe['n_recibo']|escape:'html':'UTF-8'}</td>
+          <td class="column-columnname">{$order_nfe['chave_acesso']|escape:'html':'UTF-8'}</td>
+          <td class="column-columnname"><a target="_blank" href="{$order_nfe['url_xml']|escape:'html':'UTF-8'}">Download XML</a></td>
           <td class="column-columnname">
-            <a class="" target="_blank" href="{$order_nfe['url_danfe']}">Danfe </a>|
-            <a class="" target="_blank" href="{$order_nfe['url_danfe_simplificada']}"> Danfe Simples </a>|
-            <a class="" target="_blank" href="{$order_nfe['url_danfe_etiqueta']}"> Danfe Etiqueta</a>
+            <a class="" target="_blank" href="{$order_nfe['url_danfe']|escape:'html':'UTF-8'}">Danfe </a>|
+            <a class="" target="_blank" href="{$order_nfe['url_danfe_simplificada']|escape:'html':'UTF-8'}"> Danfe Simples </a>|
+            <a class="" target="_blank" href="{$order_nfe['url_danfe_etiqueta']|escape:'html':'UTF-8'}"> Danfe Etiqueta</a>
           </td>
           <td class="column-columnname" style="padding: 10px 10px;">
-            <span class="nfe-status {$order_nfe['status']}">{$order_nfe['status']}</span>
-            <a href="{$url}&atualizar=1&chave={$order_nfe['chave_acesso']}">Atualizar Status</a>
+            <span class="nfe-status {$order_nfe['status']|escape:'html':'UTF-8'}">{$order_nfe['status']|escape:'html':'UTF-8'}</span>
+            <a href="{$url|escape:'html':'UTF-8'}&atualizar=1&chave={$order_nfe['chave_acesso']|escape:'html':'UTF-8'}">Atualizar Status</a>
           </td></tr>
           {/foreach}
 

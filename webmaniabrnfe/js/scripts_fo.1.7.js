@@ -79,7 +79,7 @@ var cache = {};
               adminToken: sec_token,
             },
             success: function(json) {
-              result = $.parseJSON(json);
+              result = (typeof json === 'string' ? $.parseJSON(json) : json);
 
               if(typeof result.address_number != 'undefined'){
                 cache.address_number = result.address_number;
@@ -316,7 +316,7 @@ var cache = {};
 
       maskFields: function(){
         $('input[name="cpf"]').mask('999.999.999-99');
-        $('input[name="cnpj"]').mask('99.999.999/9999-99');
+        $('input[name="cnpj"]').mask('AA.AAA.AAA/AAAA-00');
       },
 
       initAutoFill: function(){

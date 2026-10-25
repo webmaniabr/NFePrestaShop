@@ -1,8 +1,6 @@
 jQuery(document).ready(function(){
 
-  var wmbrAjaxUrl = (typeof wmbr_module_path != 'undefined')
-    ? wmbr_module_path + 'ajax.php'
-    : '../modules/webmaniabrnfe/ajax.php';
+  var wmbrAjaxUrl = wmbr_admin_ajax_url;
 
   var WMBRBackOfficeController = {
 
@@ -208,7 +206,7 @@ jQuery(document).ready(function(){
             id_customer: id_customer,
           },
           success: function(json) {
-            var doc = $.parseJSON(json);
+            var doc = (typeof json === 'string' ? $.parseJSON(json) : json);
             WMBRBackOfficeController.ajax.applyDocument(doc);
           }
         });
@@ -236,7 +234,7 @@ jQuery(document).ready(function(){
             adminToken: sec_token,
           },
           success: function(json) {
-            result = $.parseJSON(json);
+            result = (typeof json === 'string' ? $.parseJSON(json) : json);
             if(typeof result.address_number != 'undefined'){
               $('input[name="address_number"]').val(result.address_number);
             }
@@ -289,7 +287,7 @@ jQuery(document).ready(function(){
             $('#cpf-field').fadeToggle('fast', 'swing', function(){
               $('#cnpj-field').fadeToggle('fast').addClass('active');
               // re-apply the mask once the field is visible
-              $('input[name="cnpj"]').mask('99.999.999/9999-99');
+              $('input[name="cnpj"]').mask('AA.AAA.AAA/AAAA-00');
             }).removeClass('active');
           }
 
@@ -314,7 +312,7 @@ jQuery(document).ready(function(){
         }
 
         $('input[name="cpf"]').mask('999.999.999-99');
-        $('input[name="cnpj"]').mask('99.999.999/9999-99');
+        $('input[name="cnpj"]').mask('AA.AAA.AAA/AAAA-00');
 
       }
     },
@@ -474,7 +472,7 @@ jQuery(document).ready(function(){
       handleBairroStatus(bairro_status);
     });
 
-    $('input[name="webmaniabrnfeintermediador_cnpj').mask("99.999.999/9999-99");
+    $('input[name="webmaniabrnfeintermediador_cnpj"]').mask("AA.AAA.AAA/AAAA-00");
 
     update_payment_desc_label = function() {
       
@@ -541,7 +539,7 @@ jQuery(document).ready(function(){
       },
       success: function(json) {
         
-        var result = $.parseJSON(json);
+        var result = (typeof json === 'string' ? $.parseJSON(json) : json);
         $column_select.html('<option value="">Selecionar</option>');
       
         result.results.forEach(function(value, index){

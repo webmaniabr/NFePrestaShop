@@ -55,6 +55,6 @@ jQuery(document).ready(function($){
   $('#document-types').insertBefore(target);
 
   $('#cpf-input').mask('999.999.999-99');
-  $('#cnpj-input').mask('99.999.999/9999-99');
+  $('#cnpj-input').mask('AA.AAA.AAA/AAAA-00');
 });
 </script>

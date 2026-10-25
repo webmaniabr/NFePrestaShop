@@ -1,4 +1,7 @@
 <?php
+if (!defined('_PS_VERSION_')) {
+    exit;
+}
 
 class WebmaniaBrNFeViewController14{
 
@@ -59,7 +62,7 @@ class WebmaniaBrNFeViewController14{
 
         }elseif($document_type == 'cnpj'){
           $document_type = pSQL(Tools::getValue('document_type'));
-          $document_number = pSQL(preg_replace("/[^0-9]/","",Tools::getValue('cnpj')));
+          $document_number = pSQL(WebmaniaNFeSecurity::normalizeDocument(Tools::getValue('cnpj')));
           $razao_social = pSQL(Tools::getValue('razao_social'));
           $cnpj_ie = pSQL(Tools::getValue('cnpj_ie'));
           $query = "UPDATE ". _DB_PREFIX_ ."customer SET nfe_document_type = '".$document_type."', nfe_document_number = '".$document_number."', nfe_razao_social = '".$razao_social."', nfe_pj_ie = '".$cnpj_ie."' WHERE id_customer = " . $customer_id;

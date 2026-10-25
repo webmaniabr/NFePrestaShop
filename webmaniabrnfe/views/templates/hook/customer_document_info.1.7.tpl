@@ -11,16 +11,16 @@
             </div>
             <div class="row mb-1">
                 <div class="col-4 text-right"> {if $customer_info['nfe_document_type'] == 'cpf'}CPF{else}CNPJ{/if} </div>
-                <div class="col-8"> {$customer_info['nfe_document_number']} </div>
+                <div class="col-8"> {$customer_info['nfe_document_number']|escape:'html':'UTF-8'} </div>
             </div>
             {if $customer_info['nfe_document_type'] == 'cnpj'}
                 <div class="row mb-1">
                     <div class="col-4 text-right"> Razão Social </div>
-                    <div class="col-8"> {$customer_info['nfe_razao_social']} </div>
+                    <div class="col-8"> {$customer_info['nfe_razao_social']|escape:'html':'UTF-8'} </div>
                 </div>
                 <div class="row mb-1">
                     <div class="col-4 text-right"> IE </div>
-                    <div class="col-8"> {$customer_info['nfe_pj_ie']} </div>
+                    <div class="col-8"> {$customer_info['nfe_pj_ie']|escape:'html':'UTF-8'} </div>
                 </div>
             {/if}
         </div>
